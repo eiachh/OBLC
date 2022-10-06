@@ -7,7 +7,7 @@ class Interractor:
     def __init__(self, ip, port):
         self.ip = ip
         self.port = port
-        self.apiUrl = f"http://{self.ip}:{self.port}"
+        self.apiUrl = f"{self.ip}:{self.port}"
     
     def __str__(self):
         return f"Server addr: {self.ip}:{self.port}"

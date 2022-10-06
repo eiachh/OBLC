@@ -5,12 +5,12 @@ metadata:
   labels:
     app: oblc
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
-        maxSurge: 2
-        maxUnavailable: 0
+        maxSurge: 0
+        maxUnavailable: 1
   selector:
     matchLabels:
       app: oblc

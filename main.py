@@ -28,7 +28,7 @@ class OBLC:
     def setVariableFromEnvVar(self, defaultValue, envVarName):
         envValue = os.environ.get(envVarName)
         if envValue is not None:
-            self.logger.log(f'{envVarName} is {envValue}', 'WARN')
+            self.logger.log(f'{envVarName} is {envValue}', 'Info')
             return envValue
         else:
             self.logger.log(f'{envVarName} not found returning default: {defaultValue}','WARN')
@@ -37,23 +37,12 @@ class OBLC:
     def setup(self):
         config = Configuration()
         config.INTERRACTOR_IP = self.setVariableFromEnvVar(config.INTERRACTOR_IP, 'INTERRACTOR_IP')
-        self.logger.log(f'INTERRACTOR_IP = {config.INTERRACTOR_IP}', 'Info')
-
         config.INTERRACTOR_PORT = self.setVariableFromEnvVar(config.INTERRACTOR_PORT, 'INTERRACTOR_PORT')
-        self.logger.log(f'INTERRACTOR_PORT = {config.INTERRACTOR_PORT}', 'Info')
-
         config.RESOURCE_LIMITER_ADDR = self.setVariableFromEnvVar(config.RESOURCE_LIMITER_ADDR, 'RESOURCE_LIMITER_URL')
-        self.logger.log(f'RESOURCE_LIMITER_ADDR = {config.RESOURCE_LIMITER_ADDR}', 'Info')
-
         config.BUILDING_MANAGER_ADDR = self.setVariableFromEnvVar(config.BUILDING_MANAGER_ADDR, 'BUILDING_MANAGER_URL')
-        self.logger.log(f'BUILDING_MANAGER_ADDR = {config.BUILDING_MANAGER_ADDR}', 'Info')
-
         config.LOG_LEVEL = self.setVariableFromEnvVar(config.LOG_LEVEL, 'OGAME_LOG_LEVEL')
-        self.logger.log(f'LOG_LEVEL = {config.LOG_LEVEL}', 'Info')
-
         config.BUILD_PIPELINE_REACTIVATION = self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION')
-        self.logger.log(f'BUILD_PIPELINE_REACTIVATION = {config.BUILD_PIPELINE_REACTIVATION}', 'Info')
-
+        
         self.logger.setLogLevel(config.LOG_LEVEL)
 
         return config
