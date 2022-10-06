@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: OBLC
+  labels:
+    app: OBLC
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+        maxSurge: 2
+        maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: OBLC
+  template:
+    metadata:
+      labels:
+        app: OBLC
+    spec:
+      containers:
+      - name: OBLC
+        image: eiachh/OBLC
+        imagePullPolicy: "Never"
+        env:
+        - name: "INTERRACTOR_IP"
+          value: "http://ogame-interractor.default.svc.cluster.local"
+        - name: "INTERRACTOR_PORT"
+          value: "8080"
+        - name: "RESOURCE_LIMITER_ADDR"
+          value: "http://resource-limiter.default.svc.cluster.local:5000"
+        - name: "BUILDING_MANAGER_ADDR"
+          value: "http://building-manager.default.svc.cluster.local:5000"
+        ports:
+        - containerPort: 5001

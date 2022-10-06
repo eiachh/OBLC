@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert
+    kompose.version: 1.21.0 (992df58d8)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: ogame-interractor
+  name: ogame-interractor
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
+  selector:
+    matchLabels:
+      io.kompose.service: ogame-interractor
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert
+        kompose.version: 1.21.0 (992df58d8)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: ogame-interractor
+    spec:
+      containers:
+      - name: ogame-interractor
+        image: eiachh/ogame-interractor:latest
+        imagePullPolicy: "Never"
+        ports:
+        - containerPort: 8080
+        resources: {}
+      restartPolicy: "Always"
+      serviceAccountName: ""
+      volumes: null
+status: {}
