@@ -32,5 +32,7 @@ spec:
           value: "http://resource-limiter.default.svc.cluster.local:5000"
         - name: "BUILDING_MANAGER_ADDR"
           value: "http://building-manager.default.svc.cluster.local:5000"
+        - name: "BUILD_PIPELINE_REACTIVATION"
+          value: "60"
         ports:
         - containerPort: 5001

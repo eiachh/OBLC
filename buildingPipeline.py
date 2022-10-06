@@ -17,6 +17,14 @@ class BuildingPipeline:
         self.logger = logger
         self.config = config
 
+    def checkIfRequiredServiceIsAvailable(self):
+        try:
+            requests.get(self.config.RESOURCE_LIMITER_ADDR + '/ready')
+            return True
+        except Exception as e:
+            self.logger.log(f'RESOURCE_LIMITER_ADDR service: {self.config.RESOURCE_LIMITER_ADDR} is not running', 'WARN')
+            return False
+
     def resume(self):
         self.isRunning = True
         self.execPipeline()
@@ -50,8 +58,9 @@ class BuildingPipeline:
         return json.loads(json.dumps(concatted))
 
     def callResourceLimiter(self, planetID):
-        #data = gatherDataForLimiter(planetID)
-        data = {'resources': {'Metal': 5782, 'Crystal': 3452, 'Deuterium': 0, 'Energy': 117, 'Darkmatter': 0, 'Population': 210, 'Food': 10}, 'facilities': {'RoboticsFactory': 0, 'Shipyard': 0, 'ResearchLab': 0, 'AllianceDepot': 0, 'MissileSilo': 0, 'NaniteFactory': 0, 'Terraformer': 0, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'fleetValue': 0}
+        data = self.gatherDataForLimiter(planetID)
+        #data = {'resources': {'Metal': 5782, 'Crystal': 3452, 'Deuterium': 0, 'Energy': 117, 'Darkmatter': 0, 'Population': 210, 'Food': 10}, 'facilities': {'RoboticsFactory': 0, 'Shipyard': 0, 'ResearchLab': 0, 'AllianceDepot': 0, 'MissileSilo': 0, 'NaniteFactory': 0, 'Terraformer': 0, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'fleetValue': 0}
+        self.logger.log(f'Sending data to resource limiter: {data}', 'Info')
         return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=data)
 
     def callBuildingManager(self, allowanceResponse):
@@ -60,5 +69,6 @@ class BuildingPipeline:
 
     def executePipelineOnPlanetID(self, planetID):
         allowanceResourcesResponse = self.callResourceLimiter(planetID)
+        self.logger.log(f'Resource limiter response was: {allowanceResourcesResponse}')
         #suggestedBuildingResponse = self.callBuildingManager(allowanceResourcesResponse)
         print('asd')

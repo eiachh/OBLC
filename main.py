@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from distutils.command.config import config
 import os
 from threading import Thread
@@ -11,12 +12,6 @@ from logger import OBLC_Logger
 import wrapper.interractorWrapper as InterractorWrapper
 
 class OBLC:
-    #INTERRACTOR_IP = '127.0.0.1'
-    #INTERRACTOR_PORT = '8080'
-    #status = 'normal'
-    #RESOURCE_LIMITER_URL = 'http://127.0.0.1:5000'
-    #BUILDING_MANAGER_URL ='http://127.0.0.1:5001'
-    #LOG_LEVEL = 'Info'
 
     def __init__(self):
         self.logger = OBLC_Logger('Init')
@@ -24,6 +19,8 @@ class OBLC:
 
         self.interractor = InterractorWrapper.Interractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT)
         self.buildingPipeline = BuildingPipeline(self.interractor, self.logger, self.config)
+
+        self.waitForRequiredServices()
         self.resumeBuildPipeline()
 
         self.runBody()
@@ -40,10 +37,22 @@ class OBLC:
     def setup(self):
         config = Configuration()
         config.INTERRACTOR_IP = self.setVariableFromEnvVar(config.INTERRACTOR_IP, 'INTERRACTOR_IP')
+        self.logger.log(f'INTERRACTOR_IP = {config.INTERRACTOR_IP}', 'Info')
+
         config.INTERRACTOR_PORT = self.setVariableFromEnvVar(config.INTERRACTOR_PORT, 'INTERRACTOR_PORT')
+        self.logger.log(f'INTERRACTOR_PORT = {config.INTERRACTOR_PORT}', 'Info')
+
         config.RESOURCE_LIMITER_ADDR = self.setVariableFromEnvVar(config.RESOURCE_LIMITER_ADDR, 'RESOURCE_LIMITER_URL')
+        self.logger.log(f'RESOURCE_LIMITER_ADDR = {config.RESOURCE_LIMITER_ADDR}', 'Info')
+
         config.BUILDING_MANAGER_ADDR = self.setVariableFromEnvVar(config.BUILDING_MANAGER_ADDR, 'BUILDING_MANAGER_URL')
+        self.logger.log(f'BUILDING_MANAGER_ADDR = {config.BUILDING_MANAGER_ADDR}', 'Info')
+
         config.LOG_LEVEL = self.setVariableFromEnvVar(config.LOG_LEVEL, 'OGAME_LOG_LEVEL')
+        self.logger.log(f'LOG_LEVEL = {config.LOG_LEVEL}', 'Info')
+
+        config.BUILD_PIPELINE_REACTIVATION = self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION')
+        self.logger.log(f'BUILD_PIPELINE_REACTIVATION = {config.BUILD_PIPELINE_REACTIVATION}', 'Info')
 
         self.logger.setLogLevel(config.LOG_LEVEL)
 
@@ -58,6 +67,20 @@ class OBLC:
     def pauseBuildPipeline(self):
         self.buildingPipeline.pause()
         #self.isAttackPipelineResumed = True
+
+    def waitForRequiredServices(self):
+        
+        if(not self.interractor.checkIfRequiredServiceIsAvailable(self.logger)):
+            self.waitAndRetryServiceAvailibility()
+        self.logger.log('Ogame-interractor services OK', 'Info')
+
+        if(not self.buildingPipeline.checkIfRequiredServiceIsAvailable()):
+            self.waitAndRetryServiceAvailibility()
+        self.logger.log('BuildPipeline services OK', 'Info')
+
+    def waitAndRetryServiceAvailibility(self):
+        sleep(15)
+        self.waitForRequiredServices()
 
     def runBody(self):
         counter = 0

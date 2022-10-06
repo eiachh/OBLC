@@ -8,8 +8,17 @@ class Interractor:
         self.ip = ip
         self.port = port
         self.apiUrl = f"http://{self.ip}:{self.port}"
+    
     def __str__(self):
         return f"Server addr: {self.ip}:{self.port}"
+
+    def checkIfRequiredServiceIsAvailable(self, logger):
+        try:
+            self.isUnderAttack()
+            return True
+        except Exception as e:
+            logger.log(f'Ogame-interractor service: {self.apiUrl} is not running', 'WARN')
+            return False
 
     def isUnderAttack(self):
         resp = requests.get(self.apiUrl + '/bot/is-under-attack')
