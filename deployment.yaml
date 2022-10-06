@@ -34,5 +34,7 @@ spec:
           value: "http://building-manager.default.svc.cluster.local:5000"
         - name: "BUILD_PIPELINE_REACTIVATION"
           value: "60"
+        - name: "PYTHONUNBUFFERED"
+          value: "1"
         ports:
         - containerPort: 5001
