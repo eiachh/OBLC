@@ -88,7 +88,7 @@ class BuildingPipeline:
         productionResp = self.interractor.production(planetID)
 
         if(len(productionResp) == 0):
-            self.logger.log(f'Sending POST build: {suggestedBuildingResponse["buildingID"]}/suggestedBuildingResponse["buildingLevel"]', 'Info')
+            self.logger.log(f'Sending POST build: {suggestedBuildingResponse["buildingID"]}/{suggestedBuildingResponse["buildingLevel"]}', 'Info')
             self.interractor.POSTbuild(planetID, suggestedBuildingResponse['buildingID'], suggestedBuildingResponse['buildingLevel'])
 
         print('asd')
