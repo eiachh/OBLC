@@ -8,8 +8,13 @@ from flask import Flask
 import json
 from Configuration import Configuration
 from buildingPipeline import BuildingPipeline
+from const import constants
 from logger import OBLC_Logger
 import wrapper.interractorWrapper as InterractorWrapper
+
+
+
+
 
 class OBLC:
 
@@ -18,12 +23,20 @@ class OBLC:
         self.config = self.setup()
 
         self.interractor = InterractorWrapper.Interractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT)
+        #self.interractor.POSTGetPageContent('https://s189-en.ogame.gameforge.com/game/index.php?page=ingame&component=supplies')
+        #respPlanets = self.interractor.planets()
+        #for planet in respPlanets:
+        #    planetID = planet['ID']
+        #    #self.interractor.test1(planetID)
+
+
         self.buildingPipeline = BuildingPipeline(self.interractor, self.logger, self.config)
 
         self.waitForRequiredServices()
         self.resumeBuildPipeline()
 
         self.runBody()
+
 
     def setVariableFromEnvVar(self, defaultValue, envVarName):
         envValue = os.environ.get(envVarName)
@@ -73,15 +86,15 @@ class OBLC:
 
     def runBody(self):
         counter = 0
-        while(True):
-            print("MAIN started2")
-            counter = counter + 1
-            if(counter == 3):
-                self.pauseBuildPipeline()
-                print("paused for some time")
-                sleep(10)
-                self.resumeBuildPipeline()
-            sleep(4)
+        #while(True):
+            #print("MAIN started2")
+            #counter = counter + 1
+            #if(counter == 3):
+            #    self.pauseBuildPipeline()
+            #    print("paused for some time")
+            #    sleep(10)
+            #    #self.resumeBuildPipeline()
+            #sleep(4)
 
 oblc = OBLC()
 

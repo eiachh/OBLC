@@ -1,9 +1,11 @@
 from distutils.command.config import config
 import json
+import math
 from time import sleep
 from time import sleep
 import requests
 import json
+from const import constants
 
 from Configuration import Configuration
 
@@ -59,16 +61,71 @@ class BuildingPipeline:
 
     def callResourceLimiter(self, planetID):
         data = self.gatherDataForLimiter(planetID)
-        #data = {'resources': {'Metal': 5782, 'Crystal': 3452, 'Deuterium': 0, 'Energy': 117, 'Darkmatter': 0, 'Population': 210, 'Food': 10}, 'facilities': {'RoboticsFactory': 0, 'Shipyard': 0, 'ResearchLab': 0, 'AllianceDepot': 0, 'MissileSilo': 0, 'NaniteFactory': 0, 'Terraformer': 0, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'fleetValue': 0}
         self.logger.log(f'Sending data to resource limiter: {data}', 'Info')
         return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=data)
 
-    def callBuildingManager(self, allowanceResponse):
-        allowanceResources = json.loads(allowanceResponse.text)['allowanceResources']
-        return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=allowanceResources)
+    def callBuildingManager(self, dataToSend):
+        
+        return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=dataToSend)
 
     def executePipelineOnPlanetID(self, planetID):
-        allowanceResourcesResponse = self.callResourceLimiter(planetID)
-        self.logger.log(f'Resource limiter response was: {allowanceResourcesResponse}')
-        #suggestedBuildingResponse = self.callBuildingManager(allowanceResourcesResponse)
+        allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
+        self.logger.log(f'Resource limiter response was: {allowanceResourcesJson}', 'Info')
+
+        buildingLevelsAndPrices = self.getResourceBuildingPrices(planetID)
+        concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
+        
+        self.logger.log(f'Sending data to buildingManager: {concattedData}', 'Info')
+        suggestedBuildingResponse = json.loads(self.callBuildingManager(concattedData).text)
+        self.logger.log(f'Recieved suggested building data: {suggestedBuildingResponse}', 'Info')
+
+        productionResp = self.interractor.production(planetID)
+
+        if(len(productionResp) == 0):
+            self.logger.log(f'Sending POST build: {suggestedBuildingResponse["buildingID"]}/suggestedBuildingResponse["buildingLevel"]', 'Info')
+            self.interractor.POSTbuild(planetID, suggestedBuildingResponse['buildingID'], suggestedBuildingResponse['buildingLevel'])
+
         print('asd')
+
+    def getResourceBuildingPrices(self, planetID):
+            resourceBuildingsDict = self.interractor.resourceBuildings(planetID)
+            priceOFResourceBuildingsDict = dict(resourceBuildingsDict)
+
+            levelOfMetalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE]
+            energyConsumptMetalMine = round(10*levelOfMetalMine*1.1**levelOfMetalMine)
+            priceOfMetalMine = self.interractor.price(constants.METAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] + 1)
+            priceOfMetalMine['Energy'] = energyConsumptMetalMine
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] = priceOfMetalMine
+
+
+            levelOfCrystalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE]
+            energyConsumptCrystalMine = round(10*levelOfCrystalMine*1.1**levelOfCrystalMine)
+            priceOfCrystalMine = self.interractor.price(constants.CRYSTAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] + 1)
+            priceOfCrystalMine['Energy'] = energyConsumptCrystalMine
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] = priceOfCrystalMine
+
+            levelOfDeuMine = resourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE]
+            energyConsumptDeuMine = round(20*levelOfDeuMine*1.1**levelOfDeuMine)
+            priceOfDeuMine = self.interractor.price(constants.DEU_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] + 1)
+            priceOfDeuMine['Energy'] = energyConsumptDeuMine
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] = priceOfDeuMine
+
+            priceOfSolarPlant = self.interractor.price(constants.SOLAR_PLANT, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_PLANT] + 1)
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_PLANT] = priceOfSolarPlant
+
+            priceOfFusionReactor = self.interractor.price(constants.FUSION_REACTOR, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_FUSION_REACTOR] + 1)
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_FUSION_REACTOR] = priceOfFusionReactor
+
+            priceOfSolarSatellite = self.interractor.price(constants.SOLAR_SATELLITE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_SATELLITE] + 1)
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_SATELLITE] = priceOfSolarSatellite
+
+            priceOfMetalStorage = self.interractor.price(constants.METAL_STORAGE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_STORAGE] + 1)
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_STORAGE] = priceOfMetalStorage
+
+            priceOfCrystalStorage = self.interractor.price(constants.CRYSTAL_STORAGE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_STORAGE] + 1)
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_STORAGE] = priceOfCrystalStorage
+
+            priceOfDeuStorage = self.interractor.price(constants.DEU_STORAGE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_STORAGE] + 1)
+            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_STORAGE] = priceOfDeuStorage
+
+            return {'buildingLevels': resourceBuildingsDict, 'buildingPrices': priceOFResourceBuildingsDict}

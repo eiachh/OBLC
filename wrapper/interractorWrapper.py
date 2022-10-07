@@ -55,6 +55,7 @@ class Interractor:
         respJson = json.loads(resp.text)
         return respJson['Result']
 
+#hours := (metalCost + crystalCost) / (2500 * (1 + roboticLvl) * float64(universeSpeed) * math.Pow(2, naniteLvl))
     def price(self, ogameID, nbr):
         resp = requests.get(self.apiUrl + f"/bot/price/{ogameID}/{nbr}")
         respJson = json.loads(resp.text)
@@ -128,11 +129,19 @@ class Interractor:
         return respJson['Result']
 
 
-
-
     # TEST NEEDED
     def POSTcancelFleet(self, fleetID):
         resp = requests.post(self.apiUrl + f"/bot/fleets/{fleetID}/cancel")
+        respJson = json.loads(resp.text)
+        return respJson['Result']
+
+    def POSTGetPageContent(self, pageUrl):
+        resp = requests.post(self.apiUrl + f"/bot/page-content", data = pageUrl)
+        respJson = json.loads(resp.text)
+        return respJson['Result']
+
+    def test1(self, planetID):
+        resp = requests.post(self.apiUrl + f"/bot/planets/{planetID}/lifeform-buildings",)
         respJson = json.loads(resp.text)
         return respJson['Result']
 
