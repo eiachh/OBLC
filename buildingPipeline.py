@@ -22,10 +22,16 @@ class BuildingPipeline:
     def checkIfRequiredServiceIsAvailable(self):
         try:
             requests.get(self.config.RESOURCE_LIMITER_ADDR + '/ready')
-            return True
         except Exception as e:
             self.logger.log(f'RESOURCE_LIMITER_ADDR service: {self.config.RESOURCE_LIMITER_ADDR} is not running', 'WARN')
             return False
+
+        try:
+            requests.get(self.config.BUILDING_MANAGER_ADDR + '/ready')
+        except Exception as e:
+            self.logger.log(f'BUILDING_MANAGER_ADDR service: {self.config.BUILDING_MANAGER_ADDR} is not running', 'WARN')
+            return False
+        return True
 
     def resume(self):
         self.isRunning = True
