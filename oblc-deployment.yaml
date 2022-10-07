@@ -33,7 +33,7 @@ spec:
         - name: "BUILDING_MANAGER_ADDR"
           value: "http://build-manager.default.svc.cluster.local:5001"
         - name: "BUILD_PIPELINE_REACTIVATION"
-          value: "60"
+          value: 120
         - name: "PYTHONUNBUFFERED"
           value: "1"
         ports:

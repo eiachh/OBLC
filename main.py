@@ -54,7 +54,7 @@ class OBLC:
         config.RESOURCE_LIMITER_ADDR = self.setVariableFromEnvVar(config.RESOURCE_LIMITER_ADDR, 'RESOURCE_LIMITER_ADDR')
         config.BUILDING_MANAGER_ADDR = self.setVariableFromEnvVar(config.BUILDING_MANAGER_ADDR, 'BUILDING_MANAGER_ADDR')
         config.LOG_LEVEL = self.setVariableFromEnvVar(config.LOG_LEVEL, 'OGAME_LOG_LEVEL')
-        config.BUILD_PIPELINE_REACTIVATION = self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION')
+        config.BUILD_PIPELINE_REACTIVATION = int(self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION'))
 
         self.logger.setLogLevel(config.LOG_LEVEL)
 
