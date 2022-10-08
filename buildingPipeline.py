@@ -85,11 +85,13 @@ class BuildingPipeline:
         suggestedBuildingResponse = json.loads(self.callBuildingManager(concattedData).text)
         self.logger.log(f'Recieved suggested building data: {suggestedBuildingResponse}', 'Info')
 
-        productionResp = self.interractor.production(planetID)
+        constructionResp = self.interractor.construction(planetID)
 
+        ##GHETTO MANUEL PART
+        #TODO FIX
         if("Result" in suggestedBuildingResponse):
             print(f'Suggestion was: {suggestedBuildingResponse["Result"]}')
-        elif(len(productionResp) == 0):
+        elif(len(constructionResp) == 0):
             self.logger.log(f'Sending POST build: {suggestedBuildingResponse["buildingID"]}/{suggestedBuildingResponse["buildingLevel"]}', 'Info')
             self.interractor.POSTbuild(planetID, suggestedBuildingResponse['buildingID'], suggestedBuildingResponse['buildingLevel'])
 
