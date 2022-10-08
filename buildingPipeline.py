@@ -82,7 +82,8 @@ class BuildingPipeline:
         concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
         
         self.logger.log(f'Sending data to buildingManager: {concattedData}', 'Info')
-        suggestedBuildingResponse = json.loads(self.callBuildingManager(concattedData).text)
+        buildManagerResponse = self.callBuildingManager(concattedData)
+        suggestedBuildingResponse = json.loads(buildManagerResponse.text)
         self.logger.log(f'Recieved suggested building data: {suggestedBuildingResponse}', 'Info')
 
         constructionResp = self.interractor.construction(planetID)
@@ -102,20 +103,23 @@ class BuildingPipeline:
             priceOFResourceBuildingsDict = dict(resourceBuildingsDict)
 
             levelOfMetalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE]
-            energyConsumptMetalMine = round(10*levelOfMetalMine*1.1**levelOfMetalMine)
+            prevLevelOfMetalMine = levelOfMetalMine - 1
+            energyConsumptMetalMine = round(10*levelOfMetalMine*1.1**levelOfMetalMine) - round(10*prevLevelOfMetalMine*1.1**prevLevelOfMetalMine)
             priceOfMetalMine = self.interractor.price(constants.METAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] + 1)
             priceOfMetalMine['Energy'] = energyConsumptMetalMine
             priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] = priceOfMetalMine
 
 
             levelOfCrystalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE]
-            energyConsumptCrystalMine = round(10*levelOfCrystalMine*1.1**levelOfCrystalMine)
+            prevLevelOfCrystalMine = levelOfCrystalMine - 1
+            energyConsumptCrystalMine = round(10*levelOfCrystalMine*1.1**levelOfCrystalMine) - round(10*prevLevelOfCrystalMine*1.1**prevLevelOfCrystalMine)
             priceOfCrystalMine = self.interractor.price(constants.CRYSTAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] + 1)
             priceOfCrystalMine['Energy'] = energyConsumptCrystalMine
             priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] = priceOfCrystalMine
 
             levelOfDeuMine = resourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE]
-            energyConsumptDeuMine = round(20*levelOfDeuMine*1.1**levelOfDeuMine)
+            prevLevelOfDeuMine = levelOfDeuMine - 1
+            energyConsumptDeuMine = round(20*levelOfDeuMine*1.1**levelOfDeuMine) - round(20*prevLevelOfDeuMine*1.1**prevLevelOfDeuMine)
             priceOfDeuMine = self.interractor.price(constants.DEU_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] + 1)
             priceOfDeuMine['Energy'] = energyConsumptDeuMine
             priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] = priceOfDeuMine
