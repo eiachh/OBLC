@@ -91,7 +91,7 @@ class BuildingPipeline:
         #TODO FIX
         if("Result" in suggestedBuildingResponse):
             print(f'Suggestion was: {suggestedBuildingResponse["Result"]}')
-        elif(len(constructionResp) == 0):
+        elif(constructionResp['BuildingCountdown'] == 0):
             self.logger.log(f'Sending POST build: {suggestedBuildingResponse["buildingID"]}/{suggestedBuildingResponse["buildingLevel"]}', 'Info')
             self.interractor.POSTbuild(planetID, suggestedBuildingResponse['buildingID'], suggestedBuildingResponse['buildingLevel'])
 
