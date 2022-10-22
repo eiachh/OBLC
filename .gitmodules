@@ -1,0 +1,3 @@
+[submodule "common-lib"]
+	path = common-lib
+	url = https://github.com/eiachh/ogame-common-lib.git
