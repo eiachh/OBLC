@@ -1,15 +1,14 @@
-from asyncio.log import logger
 from distutils.command.config import config
 import os
 from threading import Thread
 from time import sleep
+from common_lib.logger import OBLC_Logger
 import requests
 from flask import Flask
 import json
 from Configuration import Configuration
 from buildingPipeline import BuildingPipeline
-from const import constants
-from logger import OBLC_Logger
+
 import wrapper.interractorWrapper as InterractorWrapper
 
 class OBLC:
@@ -19,20 +18,12 @@ class OBLC:
         self.config = self.setup()
 
         self.interractor = InterractorWrapper.Interractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT)
-        #self.interractor.POSTGetPageContent('https://s189-en.ogame.gameforge.com/game/index.php?page=ingame&component=supplies')
-        #respPlanets = self.interractor.planets()
-        #for planet in respPlanets:
-        #    planetID = planet['ID']
-        #    #self.interractor.test1(planetID)
-
-
         self.buildingPipeline = BuildingPipeline(self.interractor, self.logger, self.config)
 
         self.waitForRequiredServices()
         self.resumeBuildPipeline()
 
         self.runBody()
-
 
     def setVariableFromEnvVar(self, defaultValue, envVarName):
         envValue = os.environ.get(envVarName)
@@ -49,6 +40,7 @@ class OBLC:
         config.INTERRACTOR_PORT = self.setVariableFromEnvVar(config.INTERRACTOR_PORT, 'INTERRACTOR_PORT')
         config.RESOURCE_LIMITER_ADDR = self.setVariableFromEnvVar(config.RESOURCE_LIMITER_ADDR, 'RESOURCE_LIMITER_ADDR')
         config.BUILDING_MANAGER_ADDR = self.setVariableFromEnvVar(config.BUILDING_MANAGER_ADDR, 'BUILDING_MANAGER_ADDR')
+        config.PROGRESSION_MANAGER_ADDR = self.setVariableFromEnvVar(config.PROGRESSION_MANAGER_ADDR, 'PROGRESSION_MANAGER_ADDR')
         config.LOG_LEVEL = self.setVariableFromEnvVar(config.LOG_LEVEL, 'OGAME_LOG_LEVEL')
         config.BUILD_PIPELINE_REACTIVATION = int(self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION'))
 
@@ -92,22 +84,25 @@ class OBLC:
             #    #self.resumeBuildPipeline()
             #sleep(4)
 
-oblc = OBLC()
+    def justTestTmp(self):
+        print("test func ran")
+        #self.interractor.POSTGetPageContent('https://s189-en.ogame.gameforge.com/game/index.php?page=ingame&component=supplies')
+        #respPlanets = self.interractor.planets()
+        #for planet in respPlanets:
+        #    planetID = planet['ID']
+        #    #self.interractor.test1(planetID)
 
-    #respPlanets = interractor.planets()
-    #for planet in respPlanets:
+        #respPlanets = interractor.planets()
+        #for planet in respPlanets:
         #planetID = planet['ID']
         #executePipeline(planetID)
 
 
-    #interractor.ships(33637224)
+        #interractor.ships(33637224)
+        #interractor.build(33637224,4,1)
+        #sleep(2)
+        #interractor.cancelBuild(33637224,4)
+        #interractor.resources(33637224)
+        #interractor.resourceBuildings(33637224)
 
-
-
-    #interractor.build(33637224,4,1)
-    #sleep(2)
-    #interractor.cancelBuild(33637224,4)
-    #interractor.resources(33637224)
-
-
-    #interractor.resourceBuildings(33637224)
+oblc = OBLC()

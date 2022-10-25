@@ -5,7 +5,7 @@ from time import sleep
 from time import sleep
 import requests
 import json
-from const import constants
+from common_lib.const import constants
 
 from Configuration import Configuration
 
@@ -31,6 +31,13 @@ class BuildingPipeline:
         except Exception as e:
             self.logger.log(f'BUILDING_MANAGER_ADDR service: {self.config.BUILDING_MANAGER_ADDR} is not running', 'WARN')
             return False
+        
+        try:
+            requests.get(self.config.PROGRESSION_MANAGER_ADDR + '/ready')
+        except Exception as e:
+            self.logger.log(f'PROGRESSION_MANAGER_ADDR service: {self.config.PROGRESSION_MANAGER_ADDR} is not running', 'WARN')
+            return False
+
         return True
 
     def resume(self):
@@ -71,7 +78,9 @@ class BuildingPipeline:
         return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=data)
 
     def callBuildingManager(self, dataToSend):
-        
+        return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=dataToSend)
+
+    def callProgressionManager(self, dataToSend):
         return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=dataToSend)
 
     def executePipelineOnPlanetID(self, planetID):
@@ -80,11 +89,21 @@ class BuildingPipeline:
 
         buildingLevelsAndPrices = self.getResourceBuildingPrices(planetID)
         concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
-        
+
         self.logger.log(f'Sending data to buildingManager: {concattedData}', 'Info')
         buildManagerResponse = self.callBuildingManager(concattedData)
         suggestedBuildingResponse = json.loads(buildManagerResponse.text)
+        
+        facilityLevelsAndPrices = self.getFacilitiesPrices(planetID)
+        researchLevelsAndPrices = self.getResearchPrices()
+        concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices}
+
+        progressionManagerResponse = self.callProgressionManager(concattedData)
+        progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
+
+        self.logger.log(f'progression manager resp: {progressionManagerResponseJson}', 'Info')
         self.logger.log(f'Recieved suggested building data: {suggestedBuildingResponse}', 'Info')
+
 
         constructionResp = self.interractor.construction(planetID)
 
@@ -98,6 +117,84 @@ class BuildingPipeline:
 
         print('asd')
 
+    def getFacilitiesPrices(self, planetID):
+        facilitiesDict = self.interractor.facilities(planetID)
+        priceOFFacilitiesDict = dict(facilitiesDict)
+
+        price = self.interractor.price(constants.ROBOT_FACTORY, priceOFFacilitiesDict[constants.ATTR_NAME_OF_ROBOT_FACTORY] + 1)
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_ROBOT_FACTORY] = price
+
+        price = self.interractor.price(constants.SHIPYARD, priceOFFacilitiesDict[constants.ATTR_NAME_OF_SHIPYARD] + 1)
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_SHIPYARD] = price
+
+        price = self.interractor.price(constants.RESEARCH_LAB, priceOFFacilitiesDict[constants.ATTR_NAME_OF_RESEARCH_LAB] + 1)
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_RESEARCH_LAB] = price
+
+        price = self.interractor.price(constants.MISSILE_SILO, priceOFFacilitiesDict[constants.ATTR_NAME_OF_MISSILE_SILO] + 1)
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_MISSILE_SILO] = price
+
+        price = self.interractor.price(constants.NANITE_FACTORY, priceOFFacilitiesDict[constants.ATTR_NAME_OF_NANITE_FACTORY] + 1)
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_NANITE_FACTORY] = price
+
+        price = self.interractor.price(constants.TERRAFORMER, priceOFFacilitiesDict[constants.ATTR_NAME_OF_TERRAFORMER] + 1)
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_TERRAFORMER] = price
+
+        return {'facilityLevels': facilitiesDict, 'facilityPrices': priceOFFacilitiesDict}
+
+    def getResearchPrices(self):
+        researchesDict = self.interractor.research()
+        priceOFResearchesDict = dict(researchesDict)
+
+        price = self.interractor.price(constants.ENERGY_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_ENERGY_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ENERGY_TECH] = price
+
+        price = self.interractor.price(constants.LASER_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_LASER_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_LASER_TECH] = price
+
+        price = self.interractor.price(constants.ION_Tech, priceOFResearchesDict[constants.ATTR_NAME_OF_ION_Tech] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ION_Tech] = price
+
+        price = self.interractor.price(constants.HYPER_SPACE_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_HYPER_SPACE_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_HYPER_SPACE_TECH] = price
+
+        price = self.interractor.price(constants.PLASMA_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_PLASMA_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_PLASMA_TECH] = price
+
+        price = self.interractor.price(constants.COMBUSTION_DRIVE, priceOFResearchesDict[constants.ATTR_NAME_OF_COMBUSTION_DRIVE] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_COMBUSTION_DRIVE] = price
+
+        price = self.interractor.price(constants.IMPULSE_DRIVE, priceOFResearchesDict[constants.ATTR_NAME_OF_IMPULSE_DRIVE] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_IMPULSE_DRIVE] = price
+
+        price = self.interractor.price(constants.HYPERSPACE_DRIVE, priceOFResearchesDict[constants.ATTR_NAME_OF_HYPERSPACE_DRIVE] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_HYPERSPACE_DRIVE] = price
+
+        price = self.interractor.price(constants.SPY_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_SPY_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_SPY_TECH] = price
+
+        price = self.interractor.price(constants.COMPUTER_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_COMPUTER_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_COMPUTER_TECH] = price
+
+        price = self.interractor.price(constants.ASTROPHYSICS, priceOFResearchesDict[constants.ATTR_NAME_OF_ASTROPHYSICS] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ASTROPHYSICS] = price
+
+        price = self.interractor.price(constants.INT_GAL_RESEARCH, priceOFResearchesDict[constants.ATTR_NAME_OF_INT_GAL_RESEARCH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_INT_GAL_RESEARCH] = price
+
+        price = self.interractor.price(constants.GRAVITON_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_GRAVITON_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_GRAVITON_TECH] = price
+
+        price = self.interractor.price(constants.WEAPON_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_WEAPON_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_WEAPON_TECH] = price
+
+        price = self.interractor.price(constants.SHIELD_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_SHIELD_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_SHIELD_TECH] = price
+
+        price = self.interractor.price(constants.ARMOUR_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_ARMOUR_TECH] + 1)
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ARMOUR_TECH] = price
+
+        return {'researchLevels': researchesDict, 'researchPrices': priceOFResearchesDict}
+
     def getResourceBuildingPrices(self, planetID):
             resourceBuildingsDict = self.interractor.resourceBuildings(planetID)
             priceOFResourceBuildingsDict = dict(resourceBuildingsDict)
@@ -108,7 +205,6 @@ class BuildingPipeline:
             priceOfMetalMine = self.interractor.price(constants.METAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] + 1)
             priceOfMetalMine['Energy'] = energyConsumptMetalMine
             priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] = priceOfMetalMine
-
 
             levelOfCrystalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE]
             prevLevelOfCrystalMine = levelOfCrystalMine - 1

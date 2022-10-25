@@ -32,9 +32,11 @@ spec:
           value: "http://resource-limiter.default.svc.cluster.local:5000"
         - name: "BUILDING_MANAGER_ADDR"
           value: "http://build-manager.default.svc.cluster.local:5001"
+        - name: "PROGRESSION_MANAGER_ADDR"
+          value: "http://progression-manager.default.svc.cluster.local:5002"
         - name: "BUILD_PIPELINE_REACTIVATION"
           value: "120"
         - name: "PYTHONUNBUFFERED"
           value: "1"
         ports:
-        - containerPort: 5001
+        - containerPort: 4999
