@@ -81,9 +81,13 @@ class BuildingPipeline:
         return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=dataToSend)
 
     def callProgressionManager(self, dataToSend):
-        return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=dataToSend)
+        return requests.get(self.config.PROGRESSION_MANAGER_ADDR + '/get_progression_suggestion', json=dataToSend)
 
     def executePipelineOnPlanetID(self, planetID):
+        self.dummyDataSend()
+        return
+
+
         allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
         self.logger.log(f'Resource limiter response was: {allowanceResourcesJson}', 'Info')
 
@@ -97,6 +101,9 @@ class BuildingPipeline:
         facilityLevelsAndPrices = self.getFacilitiesPrices(planetID)
         researchLevelsAndPrices = self.getResearchPrices()
         concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices}
+
+        print('CONCATTED DATA')
+        print(concattedData)
 
         progressionManagerResponse = self.callProgressionManager(concattedData)
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
@@ -239,3 +246,9 @@ class BuildingPipeline:
             priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_STORAGE] = priceOfDeuStorage
 
             return {'buildingLevels': resourceBuildingsDict, 'buildingPrices': priceOFResourceBuildingsDict}
+
+    def dummyDataSend(self):
+        dummyData = "{'actualResources': {'Crystal': 10000, 'Darkmatter': 0, 'Deuterium': 10000, 'Energy': 220, 'Food': 10, 'Metal': 75000, 'Population': 210}, 'allowanceResources': {'Crystal': 10000, 'Deuterium': 10000, 'Metal': 75000}, 'allowanceShips': {'Crystal': 0, 'Deuterium': 0, 'Metal': 0}, 'buildingLevels': {'MetalMine': 13, 'CrystalMine': 11, 'DeuteriumSynthesizer': 7, 'SolarPlant': 15, 'FusionReactor': 0, 'SolarSatellite': 0, 'MetalStorage': 3, 'CrystalStorage': 0, 'DeuteriumTank': 0}, 'buildingPrices': {'MetalMine': {'Metal': 11677, 'Crystal': 2919, 'Deuterium': 0, 'Energy': 72, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'CrystalMine': {'Metal': 8444, 'Crystal': 4222, 'Deuterium': 0, 'Energy': 55, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'DeuteriumSynthesizer': {'Metal': 3844, 'Crystal': 1281, 'Deuterium': 0, 'Energy': 60, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'SolarPlant': {'Metal': 32842, 'Crystal': 13136, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'FusionReactor': {'Metal': 900, 'Crystal': 360, 'Deuterium': 180, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'SolarSatellite': {'Metal': 0, 'Crystal': 2000, 'Deuterium': 500, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'MetalStorage': {'Metal': 8000, 'Crystal': 0, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'CrystalStorage': {'Metal': 1000, 'Crystal': 500, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'DeuteriumTank': {'Metal': 1000, 'Crystal': 1000, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}}, 'facilityLevels': {'RoboticsFactory': 0, 'Shipyard': 0, 'ResearchLab': 0, 'AllianceDepot': 0, 'MissileSilo': 0, 'NaniteFactory': 0, 'Terraformer': 0, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'facilityPrices': {'RoboticsFactory': {'Metal': 400, 'Crystal': 120, 'Deuterium': 200, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'Shipyard': {'Metal': 400, 'Crystal': 200, 'Deuterium': 100, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ResearchLab': {'Metal': 200, 'Crystal': 400, 'Deuterium': 200, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'AllianceDepot': 0, 'MissileSilo': {'Metal': 20000, 'Crystal': 20000, 'Deuterium': 1000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'NaniteFactory': {'Metal': 1000000, 'Crystal': 500000, 'Deuterium': 100000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'Terraformer': {'Metal': 0, 'Crystal': 50000, 'Deuterium': 100000, 'Energy': 1000, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'researchLevels': {'EnergyTechnology': 0, 'LaserTechnology': 0, 'IonTechnology': 0, 'HyperspaceTechnology': 0, 'PlasmaTechnology': 0, 'CombustionDrive': 0, 'ImpulseDrive': 0, 'HyperspaceDrive': 0, 'EspionageTechnology': 0, 'ComputerTechnology': 0, 'Astrophysics': 0, 'IntergalacticResearchNetwork': 0, 'GravitonTechnology': 0, 'WeaponsTechnology': 0, 'ShieldingTechnology': 0, 'ArmourTechnology': 0}, 'researchPrices': {'EnergyTechnology': {'Metal': 0, 'Crystal': 800, 'Deuterium': 400, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'LaserTechnology': {'Metal': 200, 'Crystal': 100, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'IonTechnology': {'Metal': 1000, 'Crystal': 300, 'Deuterium': 100, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'HyperspaceTechnology': {'Metal': 0, 'Crystal': 4000, 'Deuterium': 2000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'PlasmaTechnology': {'Metal': 2000, 'Crystal': 4000, 'Deuterium': 1000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'CombustionDrive': {'Metal': 400, 'Crystal': 0, 'Deuterium': 600, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ImpulseDrive': {'Metal': 2000, 'Crystal': 4000, 'Deuterium': 600, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'HyperspaceDrive': {'Metal': 10000, 'Crystal': 20000, 'Deuterium': 6000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'EspionageTechnology': {'Metal': 200, 'Crystal': 1000, 'Deuterium': 200, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ComputerTechnology': {'Metal': 0, 'Crystal': 400, 'Deuterium': 600, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'Astrophysics': {'Metal': 4000, 'Crystal': 8000, 'Deuterium': 4000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'IntergalacticResearchNetwork': {'Metal': 240000, 'Crystal': 400000, 'Deuterium': 160000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'GravitonTechnology': {'Metal': 0, 'Crystal': 0, 'Deuterium': 0, 'Energy': 300000, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'WeaponsTechnology': {'Metal': 800, 'Crystal': 200, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ShieldingTechnology': {'Metal': 200, 'Crystal': 600, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ArmourTechnology': {'Metal': 1000, 'Crystal': 0, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}}}"
+        progressionManagerResponse = self.callProgressionManager(dummyData)
+
+
