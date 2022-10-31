@@ -145,6 +145,13 @@ class Interractor:
         respJson = json.loads(resp.text)
         return respJson['Result']
 
+    def espReportTest1(self):
+        resp = requests.get(self.apiUrl + f"/bot/espionage-report")
+        respJson = json.loads(resp.text)
+        return respJson['Result']
+
+#/bot/espionage-report
+
     ##/bot/delete-report/:messageID
     ##POST /bot/delete-all-espionage-reports
     ##POST /bot/delete-all-reports/:tabIndex

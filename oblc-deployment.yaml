@@ -34,6 +34,8 @@ spec:
           value: "http://build-manager.default.svc.cluster.local:5001"
         - name: "PROGRESSION_MANAGER_ADDR"
           value: "http://progression-manager.default.svc.cluster.local:5002"
+        - name: "RESEARCH_MANAGER_ADDR"
+          value: "http://research-manager.default.svc.cluster.local:5003"
         - name: "BUILD_PIPELINE_REACTIVATION"
           value: "120"
         - name: "PYTHONUNBUFFERED"
