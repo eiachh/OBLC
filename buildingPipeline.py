@@ -108,6 +108,8 @@ class BuildingPipeline:
 
         self.logger.log(f'Sending Data to progression manager: {concattedData}', 'Info')
         progressionManagerResponse = self.callProgressionManager(concattedData)
+
+        self.logger.log(f'progression manager response before json: {progressionManagerResponse.text}', 'Info')
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
 
         self.logger.log(f'progression manager resp: {progressionManagerResponseJson}', 'Info')
