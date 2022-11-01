@@ -43,6 +43,12 @@ class BuildingPipeline:
         except Exception as e:
             self.logger.log(f'RESEARCH_MANAGER_ADDR service: {self.config.RESEARCH_MANAGER_ADDR} is not running', 'WARN')
             return False
+            
+        try:
+            requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/ready')
+        except Exception as e:
+            self.logger.log(f'INVESTMENT_MANAGER_ADDR service: {self.config.INVESTMENT_MANAGER_ADDR} is not running', 'WARN')
+            return False
 
         return True
 
