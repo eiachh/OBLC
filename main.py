@@ -42,6 +42,7 @@ class OBLC:
         config.BUILDING_MANAGER_ADDR = self.setVariableFromEnvVar(config.BUILDING_MANAGER_ADDR, 'BUILDING_MANAGER_ADDR')
         config.PROGRESSION_MANAGER_ADDR = self.setVariableFromEnvVar(config.PROGRESSION_MANAGER_ADDR, 'PROGRESSION_MANAGER_ADDR')
         config.RESEARCH_MANAGER_ADDR = self.setVariableFromEnvVar(config.RESEARCH_MANAGER_ADDR, 'RESEARCH_MANAGER_ADDR')
+        config.INVESTMENT_MANAGER_ADDR = self.setVariableFromEnvVar(config.INVESTMENT_MANAGER_ADDR, 'INVESTMENT_MANAGER_ADDR')
         config.LOG_LEVEL = self.setVariableFromEnvVar(config.LOG_LEVEL, 'OGAME_LOG_LEVEL')
         config.BUILD_PIPELINE_REACTIVATION = int(self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION'))
 
