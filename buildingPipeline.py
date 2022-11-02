@@ -111,7 +111,11 @@ class BuildingPipeline:
 
         self.logger.log(f'progression manager response before json: {progressionManagerResponse.text}', 'Info')
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
+        progressionManagerResponseJson = {'buildingManager' : progressionManagerResponseJson}
 
+        concattedData = {**concattedData, **progressionManagerResponseJson}
+        print("asdadas")
+        print(concattedData)
         self.logger.log(f'progression manager resp: {progressionManagerResponseJson}', 'Info')
 
         #constructionResp = self.interractor.construction(planetID)
