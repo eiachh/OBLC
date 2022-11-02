@@ -95,6 +95,9 @@ class BuildingPipeline:
     def callProgressionManager(self, dataToSend):
         return requests.get(self.config.PROGRESSION_MANAGER_ADDR + '/get_progression_suggestion', json=dataToSend)
 
+    def callResearchManager(self, dataToSend):
+        return requests.get(self.config.RESEARCH_MANAGER_ADDR + '/get_preferred_research', json=dataToSend)
+
     def executePipelineOnPlanetID(self, planetID):
 
         allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
@@ -119,10 +122,13 @@ class BuildingPipeline:
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
         progressionManagerResponseJson = {'buildingManager' : progressionManagerResponseJson}
 
-        concattedData = {**concattedData, **progressionManagerResponseJson}
-        print("asdadas")
+        researchManagerResp = self.callResearchManager(concattedData)
+        researchManagerRespJson = json.loads(researchManagerResp.text)
+        
+        concattedData = {**concattedData, **progressionManagerResponseJson, **researchManagerRespJson}
         print(concattedData)
         self.logger.log(f'progression manager resp: {progressionManagerResponseJson}', 'Info')
+
 
         #constructionResp = self.interractor.construction(planetID)
 
