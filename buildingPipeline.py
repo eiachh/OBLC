@@ -119,7 +119,7 @@ class BuildingPipeline:
         researchLevelsAndPrices = self.getResearchPrices()
         concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices, **suggestedBuildingResponse}
 
-        self.logger.log(f'Sending Data to progression manager: {concattedData}', 'Info')
+        self.logger.logMinorInfo(f'Sending Data to progression manager: {concattedData}')
         progressionManagerResponse = self.callProgressionManager(concattedData)
 
         self.logger.logMainInfo(f'progression manager response before json: {progressionManagerResponse.text}')
