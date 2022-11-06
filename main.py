@@ -14,7 +14,7 @@ import wrapper.interractorWrapper as InterractorWrapper
 class OBLC:
 
     def __init__(self):
-        self.logger = OBLC_Logger('Init')
+        self.logger = OBLC_Logger('Init', 'OBLC')
         self.config = self.setup()
 
         self.interractor = InterractorWrapper.Interractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT)
@@ -28,10 +28,10 @@ class OBLC:
     def setVariableFromEnvVar(self, defaultValue, envVarName):
         envValue = os.environ.get(envVarName)
         if envValue is not None:
-            self.logger.log(f'{envVarName} is {envValue}', 'Info')
+            self.logger.logMainInfo(f'{envVarName} is {envValue}')
             return envValue
         else:
-            self.logger.log(f'{envVarName} not found returning default: {defaultValue}','WARN')
+            self.logger.logWarn(f'{envVarName} not found returning default: {defaultValue}')
             return defaultValue
 
     def setup(self):
@@ -64,11 +64,11 @@ class OBLC:
         
         if(not self.interractor.checkIfRequiredServiceIsAvailable(self.logger)):
             self.waitAndRetryServiceAvailibility()
-        self.logger.log('Ogame-interractor services OK', 'Info')
+        self.logger.logMainInfo('Ogame-interractor services OK')
 
         if(not self.buildingPipeline.checkIfRequiredServiceIsAvailable()):
             self.waitAndRetryServiceAvailibility()
-        self.logger.log('BuildPipeline services OK', 'Info')
+        self.logger.logMainInfo('BuildPipeline services OK')
 
     def waitAndRetryServiceAvailibility(self):
         sleep(15)

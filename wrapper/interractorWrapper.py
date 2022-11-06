@@ -17,7 +17,7 @@ class Interractor:
             self.isUnderAttack()
             return True
         except Exception as e:
-            logger.log(f'Ogame-interractor service: {self.apiUrl} is not running', 'WARN')
+            logger.logWarn(f'Ogame-interractor service: {self.apiUrl} is not running')
             return False
 
     def isUnderAttack(self):
@@ -112,7 +112,7 @@ class Interractor:
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def construction(self, planetID):
+    def constructionAndResearch(self, planetID):
         resp = requests.get(self.apiUrl + f"/bot/planets/{planetID}/constructions")
         respJson = json.loads(resp.text)
         return respJson['Result']

@@ -23,32 +23,32 @@ class BuildingPipeline:
         try:
             requests.get(self.config.RESOURCE_LIMITER_ADDR + '/ready')
         except Exception as e:
-            self.logger.log(f'RESOURCE_LIMITER_ADDR service: {self.config.RESOURCE_LIMITER_ADDR} is not running', 'WARN')
+            self.logger.logWarn(f'RESOURCE_LIMITER_ADDR service: {self.config.RESOURCE_LIMITER_ADDR} is not running')
             return False
 
         try:
             requests.get(self.config.BUILDING_MANAGER_ADDR + '/ready')
         except Exception as e:
-            self.logger.log(f'BUILDING_MANAGER_ADDR service: {self.config.BUILDING_MANAGER_ADDR} is not running', 'WARN')
+            self.logger.logWarn(f'BUILDING_MANAGER_ADDR service: {self.config.BUILDING_MANAGER_ADDR} is not running')
             return False
         
         try:
             requests.get(self.config.PROGRESSION_MANAGER_ADDR + '/ready')
         except Exception as e:
-            self.logger.log(f'PROGRESSION_MANAGER_ADDR service: {self.config.PROGRESSION_MANAGER_ADDR} is not running', 'WARN')
+            self.logger.logWarn(f'PROGRESSION_MANAGER_ADDR service: {self.config.PROGRESSION_MANAGER_ADDR} is not running')
             return False
 
         try:
             requests.get(self.config.RESEARCH_MANAGER_ADDR + '/ready')
         except Exception as e:
-            self.logger.log(f'RESEARCH_MANAGER_ADDR service: {self.config.RESEARCH_MANAGER_ADDR} is not running', 'WARN')
+            self.logger.logWarn(f'RESEARCH_MANAGER_ADDR service: {self.config.RESEARCH_MANAGER_ADDR} is not running')
             return False
             
-        try:
-            requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/ready')
-        except Exception as e:
-            self.logger.log(f'INVESTMENT_MANAGER_ADDR service: {self.config.INVESTMENT_MANAGER_ADDR} is not running', 'WARN')
-            return False
+        #try:
+        #    requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/ready')
+        #except Exception as e:
+        #    self.logger.logWarn(f'INVESTMENT_MANAGER_ADDR service: {self.config.INVESTMENT_MANAGER_ADDR} is not running')
+        #    return False
 
         return True
 
@@ -86,7 +86,7 @@ class BuildingPipeline:
 
     def callResourceLimiter(self, planetID):
         data = self.gatherDataForLimiter(planetID)
-        self.logger.log(f'Sending data to resource limiter: {data}', 'Info')
+        self.logger.logMinorInfo(f'Sending data to resource limiter: {data}')
         return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=data)
 
     def callBuildingManager(self, dataToSend):
@@ -98,37 +98,49 @@ class BuildingPipeline:
     def callResearchManager(self, dataToSend):
         return requests.get(self.config.RESEARCH_MANAGER_ADDR + '/get_preferred_research', json=dataToSend)
 
+    def callInvestmentManager(self, dataToSend):
+        return requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/get_investment', json=dataToSend)
+
     def executePipelineOnPlanetID(self, planetID):
 
         allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
-        self.logger.log(f'Resource limiter response was: {allowanceResourcesJson}', 'Info')
+        self.logger.logMainInfo(f'Resource limiter response was: {allowanceResourcesJson}')
 
         buildingLevelsAndPrices = self.getResourceBuildingPrices(planetID)
         concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
 
-        self.logger.log(f'Sending data to buildingManager: {concattedData}', 'Info')
+        self.logger.logMinorInfo(f'Sending data to buildingManager: {concattedData}')
         buildManagerResponse = self.callBuildingManager(concattedData)
         suggestedBuildingResponse = json.loads(buildManagerResponse.text)
-        self.logger.log(f'Recieved suggested building data: {suggestedBuildingResponse}', 'Info')
+        suggestedBuildingResponse = {'buildingManager' : suggestedBuildingResponse}
+        self.logger.logMainInfo(f'Recieved suggested building data: {suggestedBuildingResponse}')
         
         facilityLevelsAndPrices = self.getFacilitiesPrices(planetID)
         researchLevelsAndPrices = self.getResearchPrices()
-        concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices}
+        concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices, **suggestedBuildingResponse}
 
         self.logger.log(f'Sending Data to progression manager: {concattedData}', 'Info')
         progressionManagerResponse = self.callProgressionManager(concattedData)
 
-        self.logger.log(f'progression manager response before json: {progressionManagerResponse.text}', 'Info')
+        self.logger.logMainInfo(f'progression manager response before json: {progressionManagerResponse.text}')
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
-        progressionManagerResponseJson = {'buildingManager' : progressionManagerResponseJson}
+        progressionManagerResponseJson = {'progressionManager' : progressionManagerResponseJson}
 
         researchManagerResp = self.callResearchManager(concattedData)
         researchManagerRespJson = json.loads(researchManagerResp.text)
         
-        concattedData = {**concattedData, **progressionManagerResponseJson, **researchManagerRespJson}
-        print(concattedData)
-        self.logger.log(f'progression manager resp: {progressionManagerResponseJson}', 'Info')
 
+        ongoingConstructionAndResearchResp = {'ongoingConstructionsAndResearch' : self.interractor.constructionAndResearch(planetID)}
+        concattedData = {**concattedData, **progressionManagerResponseJson, **researchManagerRespJson, **ongoingConstructionAndResearchResp}
+        print(concattedData)
+        self.logger.logMainInfo(f'progression manager resp: {progressionManagerResponseJson}')
+
+
+
+        investmentManagerResp = self.callInvestmentManager(concattedData)
+        investmentManagerRespJson = json.loads(investmentManagerResp.text)
+
+        self.executeInvestmentManagerCommand(investmentManagerRespJson, planetID)
 
         #constructionResp = self.interractor.construction(planetID)
 
@@ -141,6 +153,17 @@ class BuildingPipeline:
         #    self.interractor.POSTbuild(planetID, suggestedBuildingResponse['buildingID'], suggestedBuildingResponse['buildingLevel'])
 
         print('End of building pipeline process')
+
+    def executeInvestmentManagerCommand(self, investmentManCmd, planetID):
+        invManInner = investmentManCmd['investmentManager']
+        buildingID = invManInner['constructable']['buildingID']
+        researchID = invManInner['researchable']['researchID']
+        if(buildingID != -1):
+            self.logger.logMainInfo(f"Building {constants.convertOgameIDToAttrName(buildingID)} to level: {invManInner['constructable']['buildingLevel']}")
+            self.interractor.POSTbuild(planetID, buildingID, invManInner['constructable']['buildingLevel'])
+        if(researchID != -1):
+            self.interractor.POSTbuild(planetID, researchID, invManInner['researchable']['researchLevel'])
+            self.logger.logMainInfo(f"Building {constants.convertOgameIDToAttrName(researchID)} to level: {invManInner['researchable']['researchLevel']}")
 
     def getFacilitiesPrices(self, planetID):
         facilitiesDict = self.interractor.facilities(planetID)
