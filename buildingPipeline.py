@@ -104,25 +104,25 @@ class BuildingPipeline:
     def executePipelineOnPlanetID(self, planetID):
 
         allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
-        self.logger.logMainInfo(f'Resource limiter response was: {allowanceResourcesJson}')
+        #self.logger.logMainInfo(f'Resource limiter response was: {allowanceResourcesJson}')
 
         buildingLevelsAndPrices = self.getResourceBuildingPrices(planetID)
         concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
 
-        self.logger.logMinorInfo(f'Sending data to buildingManager: {concattedData}')
+        #self.logger.logMinorInfo(f'Sending data to buildingManager: {concattedData}')
         buildManagerResponse = self.callBuildingManager(concattedData)
         suggestedBuildingResponse = json.loads(buildManagerResponse.text)
         suggestedBuildingResponse = {'buildingManager' : suggestedBuildingResponse}
-        self.logger.logMainInfo(f'Recieved suggested building data: {suggestedBuildingResponse}')
+        #self.logger.logMainInfo(f'Recieved suggested building data: {suggestedBuildingResponse}')
         
         facilityLevelsAndPrices = self.getFacilitiesPrices(planetID)
         researchLevelsAndPrices = self.getResearchPrices()
         concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices, **suggestedBuildingResponse}
 
-        self.logger.logMinorInfo(f'Sending Data to progression manager: {concattedData}')
+        #self.logger.logMinorInfo(f'Sending Data to progression manager: {concattedData}')
         progressionManagerResponse = self.callProgressionManager(concattedData)
 
-        self.logger.logMainInfo(f'progression manager response before json: {progressionManagerResponse.text}')
+        #self.logger.logMainInfo(f'progression manager response before json: {progressionManagerResponse.text}')
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
         progressionManagerResponseJson = {'progressionManager' : progressionManagerResponseJson}
 
@@ -133,24 +133,25 @@ class BuildingPipeline:
         ongoingConstructionAndResearchResp = {'ongoingConstructionsAndResearch' : self.interractor.constructionAndResearch(planetID)}
         concattedData = {**concattedData, **progressionManagerResponseJson, **researchManagerRespJson, **ongoingConstructionAndResearchResp}
         print(concattedData)
-        self.logger.logMainInfo(f'progression manager resp: {progressionManagerResponseJson}')
-
-
+        #self.logger.logMainInfo(f'progression manager resp: {progressionManagerResponseJson}')
 
         investmentManagerResp = self.callInvestmentManager(concattedData)
         investmentManagerRespJson = json.loads(investmentManagerResp.text)
 
+        self.logger.logMainInfo(f'-----------------------------------------')
+        sleep(1)
+        self.logger.logMainInfo(f'RESOURCE LIMITER: {allowanceResourcesJson}')
+        sleep(1)
+        self.logger.logMainInfo(f'BUILDING MANAGER: {suggestedBuildingResponse}')
+        sleep(1)
+        self.logger.logMainInfo(f'RESEARCH MANAGER: {researchManagerRespJson}')
+        sleep(1)
+        self.logger.logMainInfo(f'PROG MANAGER: {progressionManagerResponseJson}')
+        sleep(1)
+        self.logger.logMainInfo(f'INV MANAGER: {investmentManagerRespJson}')
+        sleep(1)
+
         self.executeInvestmentManagerCommand(investmentManagerRespJson, planetID)
-
-        #constructionResp = self.interractor.construction(planetID)
-
-        ##GHETTO MANUEL PART
-        #TODO FIX
-        #if("Result" in suggestedBuildingResponse):
-        #    print(f'Suggestion was: {suggestedBuildingResponse["Result"]}')
-        #elif(constructionResp['BuildingCountdown'] == 0):
-        #    self.logger.log(f'Sending POST build: {suggestedBuildingResponse["buildingID"]}/{suggestedBuildingResponse["buildingLevel"]}', 'Info')
-        #    self.interractor.POSTbuild(planetID, suggestedBuildingResponse['buildingID'], suggestedBuildingResponse['buildingLevel'])
 
         print('End of building pipeline process')
 
@@ -159,11 +160,11 @@ class BuildingPipeline:
         buildingID = invManInner['constructable']['buildingID']
         researchID = invManInner['researchable']['researchID']
         if(buildingID != -1):
-            self.logger.logMainInfo(f"Building {constants.convertOgameIDToAttrName(buildingID)} to level: {invManInner['constructable']['buildingLevel']}")
+            self.logger.logMainInfo(f"`Building {constants.convertOgameIDToAttrName(buildingID)} to level: {invManInner['constructable']['buildingLevel']}`")
             self.interractor.POSTbuild(planetID, buildingID, invManInner['constructable']['buildingLevel'])
         if(researchID != -1):
             self.interractor.POSTbuild(planetID, researchID, invManInner['researchable']['researchLevel'])
-            self.logger.logMainInfo(f"Building {constants.convertOgameIDToAttrName(researchID)} to level: {invManInner['researchable']['researchLevel']}")
+            self.logger.logMainInfo(f"`Building {constants.convertOgameIDToAttrName(researchID)} to level: {invManInner['researchable']['researchLevel']}`")
 
     def getFacilitiesPrices(self, planetID):
         facilitiesDict = self.interractor.facilities(planetID)
