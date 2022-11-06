@@ -104,25 +104,19 @@ class BuildingPipeline:
     def executePipelineOnPlanetID(self, planetID):
 
         allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
-        #self.logger.logMainInfo(f'Resource limiter response was: {allowanceResourcesJson}')
 
         buildingLevelsAndPrices = self.getResourceBuildingPrices(planetID)
         concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
 
-        #self.logger.logMinorInfo(f'Sending data to buildingManager: {concattedData}')
         buildManagerResponse = self.callBuildingManager(concattedData)
         suggestedBuildingResponse = json.loads(buildManagerResponse.text)
         suggestedBuildingResponse = {'buildingManager' : suggestedBuildingResponse}
-        #self.logger.logMainInfo(f'Recieved suggested building data: {suggestedBuildingResponse}')
         
         facilityLevelsAndPrices = self.getFacilitiesPrices(planetID)
         researchLevelsAndPrices = self.getResearchPrices()
         concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices, **suggestedBuildingResponse}
 
-        #self.logger.logMinorInfo(f'Sending Data to progression manager: {concattedData}')
         progressionManagerResponse = self.callProgressionManager(concattedData)
-
-        #self.logger.logMainInfo(f'progression manager response before json: {progressionManagerResponse.text}')
         progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
         progressionManagerResponseJson = {'progressionManager' : progressionManagerResponseJson}
 
@@ -132,8 +126,6 @@ class BuildingPipeline:
 
         ongoingConstructionAndResearchResp = {'ongoingConstructionsAndResearch' : self.interractor.constructionAndResearch(planetID)}
         concattedData = {**concattedData, **progressionManagerResponseJson, **researchManagerRespJson, **ongoingConstructionAndResearchResp}
-        print(concattedData)
-        #self.logger.logMainInfo(f'progression manager resp: {progressionManagerResponseJson}')
 
         investmentManagerResp = self.callInvestmentManager(concattedData)
         investmentManagerRespJson = json.loads(investmentManagerResp.text)
@@ -153,7 +145,7 @@ class BuildingPipeline:
 
         self.executeInvestmentManagerCommand(investmentManagerRespJson, planetID)
 
-        print('End of building pipeline process')
+        self.logger.logMainInfo('End of building pipeline process')
 
     def executeInvestmentManagerCommand(self, investmentManCmd, planetID):
         invManInner = investmentManCmd['investmentManager']
