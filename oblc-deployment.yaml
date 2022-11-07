@@ -38,6 +38,8 @@ spec:
           value: "http://research-manager.default.svc.cluster.local:5003"
         - name: "BUILD_PIPELINE_REACTIVATION"
           value: "120"
+        - name: "SERVICE_AVAILIBILITY_RETRY"
+          value: "100"
         - name: "INVESTMENT_MANAGER_ADDR"
           value: "http://investment-manager.default.svc.cluster.local:5004"
         - name: "PYTHONUNBUFFERED"

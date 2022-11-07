@@ -152,11 +152,11 @@ class BuildingPipeline:
         buildingID = invManInner['constructable']['buildingID']
         researchID = invManInner['researchable']['researchID']
         if(buildingID != -1):
-            self.logger.logMainInfo(f"`Building {constants.convertOgameIDToAttrName(buildingID)} to level: {invManInner['constructable']['buildingLevel']}`")
+            self.logger.logMainInfo(f"```Building {constants.convertOgameIDToAttrName(buildingID)} to level: {invManInner['constructable']['buildingLevel']}```")
             self.interractor.POSTbuild(planetID, buildingID, invManInner['constructable']['buildingLevel'])
         if(researchID != -1):
             self.interractor.POSTbuild(planetID, researchID, invManInner['researchable']['researchLevel'])
-            self.logger.logMainInfo(f"`Building {constants.convertOgameIDToAttrName(researchID)} to level: {invManInner['researchable']['researchLevel']}`")
+            self.logger.logMainInfo(f"```Building {constants.convertOgameIDToAttrName(researchID)} to level: {invManInner['researchable']['researchLevel']}```")
 
     def getFacilitiesPrices(self, planetID):
         facilitiesDict = self.interractor.facilities(planetID)

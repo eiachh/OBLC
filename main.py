@@ -10,6 +10,7 @@ from Configuration import Configuration
 from buildingPipeline import BuildingPipeline
 
 import wrapper.interractorWrapper as InterractorWrapper
+from wrapper.schedulableInterractor import SchedulableInterractor
 
 class OBLC:
 
@@ -45,6 +46,7 @@ class OBLC:
         config.INVESTMENT_MANAGER_ADDR = self.setVariableFromEnvVar(config.INVESTMENT_MANAGER_ADDR, 'INVESTMENT_MANAGER_ADDR')
         config.LOG_LEVEL = self.setVariableFromEnvVar(config.LOG_LEVEL, 'OGAME_LOG_LEVEL')
         config.BUILD_PIPELINE_REACTIVATION = int(self.setVariableFromEnvVar(config.BUILD_PIPELINE_REACTIVATION, 'BUILD_PIPELINE_REACTIVATION'))
+        config.SERVICE_AVAILIBILITY_RETRY = int(self.setVariableFromEnvVar(config.SERVICE_AVAILIBILITY_RETRY, 'SERVICE_AVAILIBILITY_RETRY'))
 
         self.logger.setLogLevel(config.LOG_LEVEL)
 
@@ -71,7 +73,7 @@ class OBLC:
         self.logger.logMainInfo('BuildPipeline services OK')
 
     def waitAndRetryServiceAvailibility(self):
-        sleep(15)
+        sleep(self.config.SERVICE_AVAILIBILITY_RETRY)
         self.waitForRequiredServices()
 
     def runBody(self):
@@ -88,23 +90,11 @@ class OBLC:
 
     def justTestTmp(self):
         print("test func ran")
-        #self.interractor.POSTGetPageContent('https://s189-en.ogame.gameforge.com/game/index.php?page=ingame&component=supplies')
-        #respPlanets = self.interractor.planets()
-        #for planet in respPlanets:
-        #    planetID = planet['ID']
-        #    #self.interractor.test1(planetID)
-
-        #respPlanets = interractor.planets()
-        #for planet in respPlanets:
-        #planetID = planet['ID']
-        #executePipeline(planetID)
-
-
-        #interractor.ships(33637224)
-        #interractor.build(33637224,4,1)
-        #sleep(2)
-        #interractor.cancelBuild(33637224,4)
-        #interractor.resources(33637224)
-        #interractor.resourceBuildings(33637224)
 
 oblc = OBLC()
+
+
+
+
+
+

@@ -20,6 +20,9 @@ class Interractor:
             logger.logWarn(f'Ogame-interractor service: {self.apiUrl} is not running')
             return False
 
+    def isSchedulable(self):
+        return False
+
     def isUnderAttack(self):
         resp = requests.get(self.apiUrl + '/bot/is-under-attack')
         respJson = json.loads(resp.text)
