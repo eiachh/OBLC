@@ -5,6 +5,7 @@ import json
 
 from common_lib.const import constants
 from common_lib.utilities import utilities
+from common_lib.utilities import RepeatedTimer
 from common_lib.const import Priority
 
 from Configuration import Configuration
@@ -21,6 +22,12 @@ class BuildingPipeline:
         self.interractor = interractor
         self.logger = logger
         self.config = config
+
+        self.scheduledQueueConsumer = RepeatedTimer(self.getPipelineReactivationInterval, self.execPipeline)
+        self.execPipeline()
+
+    def getPipelineReactivationInterval(self):
+        return self.config.BUILD_PIPELINE_REACTIVATION
 
     def checkIfRequiredServiceIsAvailable(self):
         try:
@@ -55,24 +62,11 @@ class BuildingPipeline:
 
         return True
 
-    def resume(self):
-        self.isRunning = True
-        self.execPipeline()
-
-    def pause(self):
-        self.isRunning = False
-
-    def execPipeline(self):
-        if(not self.isRunning):
-            return
-        
+    def execPipeline(self):  
         respPlanets = self.interractor.planets()
         for planet in respPlanets:
             planetID = planet['ID']
             self.executePipelineOnPlanetID(planetID)
-
-        sleep(self.config.BUILD_PIPELINE_REACTIVATION)
-        self.execPipeline()
 
     def callResourceLimiter(self, dataToSend):
         return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=dataToSend)

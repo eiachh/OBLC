@@ -1,10 +1,12 @@
 from datetime import datetime
+from time import sleep
 from wrapper.interractorWrapper import Interractor
 import requests
 import json
 from flask import Flask,request
 from wrapper.scheduleToken import ScheduleToken
 from wrapper.scheduler import Scheduler
+from common_lib.const import Priority
 
 app = Flask(__name__)
 isAppRunning = False
@@ -12,12 +14,12 @@ instance=None
 restPort = 4999
 
 class SchedulableInterractor(Interractor):
-    def __init__(self, ip, port, logger):
+    def __init__(self, ip, port, logger, scheduler):
         global instance
         super().__init__(ip,port)
         
         self.logger = logger
-        self.scheduler = Scheduler(logger)
+        self.scheduler = scheduler
 
         instance = self
             
@@ -49,6 +51,15 @@ class SchedulableInterractor(Interractor):
     def getResultOfToken():
         uuid = json.loads(request.get_json())['Result']
         return instance.scheduler.getResultOf(uuid)
+
+    @app.route('/fleetPlanet', methods=['GET'])
+    def getFleetPlanet():
+        uuid = instance.scheduler.scheduleAction(ScheduleToken(Priority.TOP,instance.planets, instance.logger, params={}))
+        result = instance.scheduler.getResultOf(uuid)
+        while(result['Completed'] == False):
+            sleep(1)
+            result = instance.scheduler.getResultOf(uuid)
+        return result['Result'][0]['Coordinate']
 
     @app.route('/galaxyInfo', methods=['GET'])
     def galaxyInfoRest():

@@ -1,6 +1,6 @@
 from distutils.command.config import config
 import os
-from threading import Thread
+from threading import Thread, current_thread
 from time import sleep
 from common_lib.logger import OBLC_Logger
 import requests
@@ -20,18 +20,20 @@ class OBLC:
     def __init__(self):
         self.logger = OBLC_Logger('Init', 'OBLC')
         self.config = self.setup()
+        thread = current_thread()
+        thread.name = 'MainThread'
 
-        self.interractor = InterractorWrapper.SchedulableInterractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT, self.logger)
-        thread = Thread(target=self.startSchedulableInterractor)
-        thread.start()
 
         self.scheduler = Scheduler(self.logger)
-        self.scheduler.startScheduler()
+        self.interractor = InterractorWrapper.SchedulableInterractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT, self.logger, self.scheduler)
+        thread = Thread(target=self.startSchedulableInterractor, name='SchedulableInterractorThread')
+        thread.start()
+
+        
 
         self.buildingPipeline = BuildingPipeline(self.scheduler, self.interractor, self.logger, self.config)
 
         #self.waitForRequiredServices()
-        self.resumeBuildPipeline()
 
         self.runBody()
 
