@@ -1,16 +1,11 @@
 from datetime import datetime
-
+from common_lib.const import Priority
 
 class ScheduleToken:
-    class Priority:
-        NORMAL = 'NORMAL_PRIORITY'  #Lowest priority, scheduler can reschedule                                  | Priority queue item
-        IMPORTANT = 'IMPORTANT_PRIORITY' #One over NORMAL priority, scheduler can reschedule                    | Priority queue item
-        TOP = 'TOP_PRIORITY' #Over NORMAL and IMPORTANT priority, scheduler can reschedule                      | Priority queue item
-        RESERVE = 'RESERVE_PRIORITY' #Over NORMAL and IMPORTANT and TOP priority, scheduler CAN NOT RESCHEDULE  | SCHEDULE queue item
-        EMERGENCY = 'EMERGENCY_PRIORITY' # Ignores all queues and all limitations, activates as soon as it is possible | QUEUE ignores
-
-    def __init__(self, priority, logger, fromTime, tillTime = datetime.min):
+    def __init__(self, priority, action, logger, fromTime = datetime.min, tillTime = datetime.min, params=None):
         self.logger = logger
+        self.action = action
+        self.params = params
 
         if(not ScheduleToken.isValidPriority(priority)):
             logger.logWarn(f"priority: {priority} is not valid. Cancelling schedule token")
@@ -18,23 +13,26 @@ class ScheduleToken:
 
         self.priority = priority
 
-        if(type(fromTime) != type(datetime.now())):
+        if(not isinstance(fromTime, datetime)):
             logger.logWarn(f"fromTime is not datetime type, current type is: {type(fromTime)}")
             return
 
         self.fromTime = fromTime
 
-        if(type(tillTime) != type(datetime.now())):
+        if(not isinstance(tillTime, datetime)):
             logger.logWarn(f"tillTime is not datetime type, current type is: {type(tillTime)}")
             return
+            
+        if(tillTime == datetime.min):
+            tillTime = self.fromTime
 
         self.tillTime = tillTime
 
     def isValidPriority(priority):
-        return(priority == ScheduleToken.Priority.NORMAL or
-               priority == ScheduleToken.Priority.IMPORTANT or
-               priority == ScheduleToken.Priority.TOP or
-               priority == ScheduleToken.Priority.RESERVE or
-               priority == ScheduleToken.Priority.EMERGENCY)
+        return(priority == Priority.NORMAL or
+               priority == Priority.IMPORTANT or
+               priority == Priority.TOP or
+               priority == Priority.RESERVE or
+               priority == Priority.EMERGENCY)
 
 

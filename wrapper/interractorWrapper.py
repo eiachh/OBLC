@@ -10,7 +10,7 @@ class Interractor:
         self.apiUrl = f"{self.ip}:{self.port}"
     
     def __str__(self):
-        return f"Server addr: {self.ip}:{self.port}"
+         return f"Basic interractor wrapper ,wrapped interractor addr: {self.ip}:{self.port}"
 
     def checkIfRequiredServiceIsAvailable(self, logger):
         try:
@@ -23,27 +23,27 @@ class Interractor:
     def isSchedulable(self):
         return False
 
-    def isUnderAttack(self):
+    def isUnderAttack(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/is-under-attack')
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def serverTime(self):
+    def serverTime(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/server/time')
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def userInfos(self):
+    def userInfos(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/user-infos')
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def fleets(self):
+    def fleets(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/fleets')
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def ourAttacks(self):
+    def ourAttacks(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/attacks')
         respJson = json.loads(resp.text)
         return respJson['Result']
@@ -53,7 +53,7 @@ class Interractor:
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def research(self):
+    def research(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/get-research')
         respJson = json.loads(resp.text)
         return respJson['Result']
@@ -64,7 +64,7 @@ class Interractor:
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def planets(self):
+    def planets(self, dataDict=None):
         resp = requests.get(self.apiUrl + '/bot/planets')
         respJson = json.loads(resp.text)
         return respJson['Result']
@@ -148,7 +148,7 @@ class Interractor:
         respJson = json.loads(resp.text)
         return respJson['Result']
 
-    def espReportTest1(self):
+    def espionageReport(self, dataDict=None):
         resp = requests.get(self.apiUrl + f"/bot/espionage-report")
         respJson = json.loads(resp.text)
         return respJson['Result']

@@ -8,23 +8,35 @@ from flask import Flask
 import json
 from Configuration import Configuration
 from buildingPipeline import BuildingPipeline
+from datetime import datetime, timedelta
 
 import wrapper.interractorWrapper as InterractorWrapper
+import wrapper.schedulableInterractor as InterractorWrapper
 from wrapper.schedulableInterractor import SchedulableInterractor
+from wrapper.scheduleToken import ScheduleToken
+from wrapper.scheduler import Scheduler
 
 class OBLC:
-
     def __init__(self):
         self.logger = OBLC_Logger('Init', 'OBLC')
         self.config = self.setup()
 
-        self.interractor = InterractorWrapper.Interractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT)
-        self.buildingPipeline = BuildingPipeline(self.interractor, self.logger, self.config)
+        self.interractor = InterractorWrapper.SchedulableInterractor(self.config.INTERRACTOR_IP, self.config.INTERRACTOR_PORT, self.logger)
+        thread = Thread(target=self.startSchedulableInterractor)
+        thread.start()
 
-        self.waitForRequiredServices()
+        self.scheduler = Scheduler(self.logger)
+        self.scheduler.startScheduler()
+
+        self.buildingPipeline = BuildingPipeline(self.scheduler, self.interractor, self.logger, self.config)
+
+        #self.waitForRequiredServices()
         self.resumeBuildPipeline()
 
         self.runBody()
+
+    def startSchedulableInterractor(self):
+        InterractorWrapper.SchedulableInterractor.startRest()
 
     def setVariableFromEnvVar(self, defaultValue, envVarName):
         envValue = os.environ.get(envVarName)
@@ -78,7 +90,8 @@ class OBLC:
 
     def runBody(self):
         counter = 0
-        #while(True):
+        while(True):
+            sleep(10)
             #print("MAIN started2")
             #counter = counter + 1
             #if(counter == 3):
@@ -90,6 +103,7 @@ class OBLC:
 
     def justTestTmp(self):
         print("test func ran")
+
 
 oblc = OBLC()
 

@@ -1,20 +1,23 @@
-from distutils.command.config import config
 import json
-import math
-from time import sleep
 from time import sleep
 import requests
 import json
+
 from common_lib.const import constants
+from common_lib.utilities import utilities
+from common_lib.const import Priority
 
 from Configuration import Configuration
+from wrapper.schedulableInterractor import SchedulableInterractor
+from wrapper.scheduleToken import ScheduleToken
 
 
 class BuildingPipeline:  
     isRunning = False
     config = Configuration
 
-    def __init__(self, interractor, logger, config):
+    def __init__(self, scheduler, interractor, logger, config):
+        self.scheduler = scheduler
         self.interractor = interractor
         self.logger = logger
         self.config = config
@@ -44,11 +47,11 @@ class BuildingPipeline:
             self.logger.logWarn(f'RESEARCH_MANAGER_ADDR service: {self.config.RESEARCH_MANAGER_ADDR} is not running')
             return False
             
-        #try:
-        #    requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/ready')
-        #except Exception as e:
-        #    self.logger.logWarn(f'INVESTMENT_MANAGER_ADDR service: {self.config.INVESTMENT_MANAGER_ADDR} is not running')
-        #    return False
+        try:
+            requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/ready')
+        except Exception as e:
+            self.logger.logWarn(f'INVESTMENT_MANAGER_ADDR service: {self.config.INVESTMENT_MANAGER_ADDR} is not running')
+            return False
 
         return True
 
@@ -71,23 +74,8 @@ class BuildingPipeline:
         sleep(self.config.BUILD_PIPELINE_REACTIVATION)
         self.execPipeline()
 
-    def gatherDataForLimiter(self, planetID):
-        resources = self.interractor.resources(planetID)
-        resourcesWithHeader =  {'resources': resources}
-
-        facilities = self.interractor.facilities(planetID)
-        facilitiesWithHeader =  {'facilities': facilities}
-
-        #TODO FAKE DATA GET REAL
-        fleetValueWIthHeader = {'fleetValue': 0}
-
-        concatted = {**resourcesWithHeader, **facilitiesWithHeader, **fleetValueWIthHeader}
-        return json.loads(json.dumps(concatted))
-
-    def callResourceLimiter(self, planetID):
-        data = self.gatherDataForLimiter(planetID)
-        self.logger.logMinorInfo(f'Sending data to resource limiter: {data}')
-        return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=data)
+    def callResourceLimiter(self, dataToSend):
+        return requests.get(self.config.RESOURCE_LIMITER_ADDR + '/get_allowances', json=dataToSend)
 
     def callBuildingManager(self, dataToSend):
         return requests.get(self.config.BUILDING_MANAGER_ADDR + '/get_prefered_building', json=dataToSend)
@@ -101,31 +89,27 @@ class BuildingPipeline:
     def callInvestmentManager(self, dataToSend):
         return requests.get(self.config.INVESTMENT_MANAGER_ADDR + '/get_investment', json=dataToSend)
 
+    def waitTillActionsCompleted(self, actionList):
+        completed = False
+        while(not completed):
+            completed = True
+            for actionUuidStr in actionList:
+                if(self.scheduler.getResultOf(actionUuidStr)['Completed'] == False):
+                    completed = False
+            sleep(5)
+        actionList.clear()
+
     def executePipelineOnPlanetID(self, planetID):
+        concattedData = self.gatherDataForPlanet(planetID)
 
-        allowanceResourcesJson = json.loads(self.callResourceLimiter(planetID).text)
+        allowanceResourcesJson = json.loads(self.callResourceLimiter(concattedData).text)
+        concattedData = {**concattedData, **allowanceResourcesJson}
 
-        buildingLevelsAndPrices = self.getResourceBuildingPrices(planetID)
-        concattedData = {**allowanceResourcesJson, **buildingLevelsAndPrices}
+        buildingManagerResponse = {'buildingManager' : json.loads(self.callBuildingManager(concattedData).text)}
+        progressionManagerResponse = {'progressionManager' : json.loads(self.callProgressionManager(concattedData).text)}
+        researchManagerRespJson = json.loads(self.callResearchManager(concattedData).text)
 
-        buildManagerResponse = self.callBuildingManager(concattedData)
-        suggestedBuildingResponse = json.loads(buildManagerResponse.text)
-        suggestedBuildingResponse = {'buildingManager' : suggestedBuildingResponse}
-        
-        facilityLevelsAndPrices = self.getFacilitiesPrices(planetID)
-        researchLevelsAndPrices = self.getResearchPrices()
-        concattedData = {**concattedData, **facilityLevelsAndPrices, **researchLevelsAndPrices, **suggestedBuildingResponse}
-
-        progressionManagerResponse = self.callProgressionManager(concattedData)
-        progressionManagerResponseJson = json.loads(progressionManagerResponse.text)
-        progressionManagerResponseJson = {'progressionManager' : progressionManagerResponseJson}
-
-        researchManagerResp = self.callResearchManager(concattedData)
-        researchManagerRespJson = json.loads(researchManagerResp.text)
-        
-
-        ongoingConstructionAndResearchResp = {'ongoingConstructionsAndResearch' : self.interractor.constructionAndResearch(planetID)}
-        concattedData = {**concattedData, **progressionManagerResponseJson, **researchManagerRespJson, **ongoingConstructionAndResearchResp}
+        concattedData = {**concattedData, **buildingManagerResponse, **progressionManagerResponse, **researchManagerRespJson}
 
         investmentManagerResp = self.callInvestmentManager(concattedData)
         investmentManagerRespJson = json.loads(investmentManagerResp.text)
@@ -134,11 +118,11 @@ class BuildingPipeline:
         sleep(1)
         self.logger.logMainInfo(f'RESOURCE LIMITER: {allowanceResourcesJson}')
         sleep(1)
-        self.logger.logMainInfo(f'BUILDING MANAGER: {suggestedBuildingResponse}')
+        self.logger.logMainInfo(f'BUILDING MANAGER: {buildingManagerResponse}')
         sleep(1)
         self.logger.logMainInfo(f'RESEARCH MANAGER: {researchManagerRespJson}')
         sleep(1)
-        self.logger.logMainInfo(f'PROG MANAGER: {progressionManagerResponseJson}')
+        self.logger.logMainInfo(f'PROG MANAGER: {progressionManagerResponse}')
         sleep(1)
         self.logger.logMainInfo(f'INV MANAGER: {investmentManagerRespJson}')
         sleep(1)
@@ -158,131 +142,150 @@ class BuildingPipeline:
             self.interractor.POSTbuild(planetID, researchID, invManInner['researchable']['researchLevel'])
             self.logger.logMainInfo(f"```Building {constants.convertOgameIDToAttrName(researchID)} to level: {invManInner['researchable']['researchLevel']}```")
 
-    def getFacilitiesPrices(self, planetID):
-        facilitiesDict = self.interractor.facilities(planetID)
-        priceOFFacilitiesDict = dict(facilitiesDict)
+    def gatherDataForPlanet(self, planetID):
+        actionUuidList = []
+        
+        uuidOfResources = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.resources, self.logger, params={'planetID': planetID}))
+        uuidOfBuildings = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.resourceBuildings, self.logger, params={'planetID': planetID}))
+        uuidOfFacilities = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.facilities, self.logger, params={'planetID': planetID}))
+        uuidOfResearch = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.research, self.logger, params={'planetID': planetID}))
+        uuidOfOngoingConstAndResearch = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.constructionAndResearch, self.logger, params={'planetID': planetID}))
 
-        price = self.interractor.price(constants.ROBOT_FACTORY, priceOFFacilitiesDict[constants.ATTR_NAME_OF_ROBOT_FACTORY] + 1)
-        priceOFFacilitiesDict[constants.ATTR_NAME_OF_ROBOT_FACTORY] = price
+        actionUuidList.append(uuidOfResources)
+        actionUuidList.append(uuidOfBuildings)
+        actionUuidList.append(uuidOfFacilities)
+        actionUuidList.append(uuidOfResearch)
+        actionUuidList.append(uuidOfOngoingConstAndResearch)
 
-        price = self.interractor.price(constants.SHIPYARD, priceOFFacilitiesDict[constants.ATTR_NAME_OF_SHIPYARD] + 1)
-        priceOFFacilitiesDict[constants.ATTR_NAME_OF_SHIPYARD] = price
+        self.waitTillActionsCompleted(actionUuidList)
 
-        price = self.interractor.price(constants.RESEARCH_LAB, priceOFFacilitiesDict[constants.ATTR_NAME_OF_RESEARCH_LAB] + 1)
-        priceOFFacilitiesDict[constants.ATTR_NAME_OF_RESEARCH_LAB] = price
+        resourcesDict = self.scheduler.getResultOf(uuidOfResources)['Result']
+        buildingLevelsDict = self.scheduler.getResultOf(uuidOfBuildings)['Result']
+        facilityLevelsDict = self.scheduler.getResultOf(uuidOfFacilities)['Result']
+        researchLevelsDict = self.scheduler.getResultOf(uuidOfResearch)['Result']
+        ongoingConstAndResearchDict = self.scheduler.getResultOf(uuidOfOngoingConstAndResearch)['Result']
 
-        price = self.interractor.price(constants.MISSILE_SILO, priceOFFacilitiesDict[constants.ATTR_NAME_OF_MISSILE_SILO] + 1)
-        priceOFFacilitiesDict[constants.ATTR_NAME_OF_MISSILE_SILO] = price
+        uuidOfMetalMinePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.METAL_MINE, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_METAL_MINE]+1}))
+        uuidOfCrystalMinePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.CRYSTAL_MINE, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE]+1}))
+        uuidOfDeuMinePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.DEU_MINE, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_DEU_MINE]+1}))
+        uuidOfSolarPlantPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.SOLAR_PLANT, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_SOLAR_PLANT]+1}))
+        uuidOfFusionReactorPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.FUSION_REACTOR, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_FUSION_REACTOR]+1}))
+        uuidOfMetalStoragePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.METAL_STORAGE, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_METAL_STORAGE]+1}))
+        uuidOfCrystalStoragePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.CRYSTAL_STORAGE, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_CRYSTAL_STORAGE]+1}))
+        uuidOfDeuStoragePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.DEU_STORAGE, 'nbr':buildingLevelsDict[constants.ATTR_NAME_OF_DEU_STORAGE]+1}))
 
-        price = self.interractor.price(constants.NANITE_FACTORY, priceOFFacilitiesDict[constants.ATTR_NAME_OF_NANITE_FACTORY] + 1)
-        priceOFFacilitiesDict[constants.ATTR_NAME_OF_NANITE_FACTORY] = price
+        uuidOfRobotFactoryPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.ROBOT_FACTORY, 'nbr':facilityLevelsDict[constants.ATTR_NAME_OF_ROBOT_FACTORY]+1}))
+        uuidOfShipyardPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.SHIPYARD, 'nbr':facilityLevelsDict[constants.ATTR_NAME_OF_SHIPYARD]+1}))
+        uuidOfResearchLabPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.RESEARCH_LAB, 'nbr':facilityLevelsDict[constants.ATTR_NAME_OF_RESEARCH_LAB]+1}))
+        uuidOfMissleSiloPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.MISSILE_SILO, 'nbr':facilityLevelsDict[constants.ATTR_NAME_OF_MISSILE_SILO]+1}))
+        uuidOfNaniteFactoryPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.NANITE_FACTORY, 'nbr':facilityLevelsDict[constants.ATTR_NAME_OF_NANITE_FACTORY]+1}))
+        uuidOfTerraformerPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.TERRAFORMER, 'nbr':facilityLevelsDict[constants.ATTR_NAME_OF_TERRAFORMER]+1}))
 
-        price = self.interractor.price(constants.TERRAFORMER, priceOFFacilitiesDict[constants.ATTR_NAME_OF_TERRAFORMER] + 1)
-        priceOFFacilitiesDict[constants.ATTR_NAME_OF_TERRAFORMER] = price
+        uuidOfEnergyTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.ENERGY_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_ENERGY_TECH]+1}))
+        uuidOfLaserTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.LASER_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_LASER_TECH]+1}))
+        uuidOfIonTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.ION_Tech, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_ION_Tech]+1}))
+        uuidOfHyperSpaceTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.HYPER_SPACE_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_HYPER_SPACE_TECH]+1}))
+        uuidOfPlasmaTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.PLASMA_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_PLASMA_TECH]+1}))
+        uuidOfCombustionDrivePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.COMBUSTION_DRIVE, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_COMBUSTION_DRIVE]+1}))
+        uuidOfImpulseDrivePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.IMPULSE_DRIVE, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_IMPULSE_DRIVE]+1}))
+        uuidOfHyperspaceDrivePrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.HYPERSPACE_DRIVE, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_HYPERSPACE_DRIVE]+1}))
+        uuidOfSpyTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.SPY_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_SPY_TECH]+1}))
+        uuidOfComputerTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.COMPUTER_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_COMPUTER_TECH]+1}))
+        uuidOfAstrophysicsPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.ASTROPHYSICS, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_ASTROPHYSICS]+1}))
+        uuidOfIntGalResearchPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.INT_GAL_RESEARCH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_INT_GAL_RESEARCH]+1}))
+        uuidOfGravitonTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.GRAVITON_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_GRAVITON_TECH]+1}))
+        uuidOfWeaponTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.WEAPON_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_WEAPON_TECH]+1}))
+        uuidOfShieldTechPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.SHIELD_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_SHIELD_TECH]+1}))
+        uuidOfArmourPrice = self.scheduler.scheduleAction(ScheduleToken(Priority.NORMAL, self.interractor.price, self.logger, params={'ogameID': constants.ARMOUR_TECH, 'nbr':researchLevelsDict[constants.ATTR_NAME_OF_ARMOUR_TECH]+1}))
 
-        return {'facilityLevels': facilitiesDict, 'facilityPrices': priceOFFacilitiesDict}
+        actionUuidList.append(uuidOfMetalMinePrice)
+        actionUuidList.append(uuidOfCrystalMinePrice)
+        actionUuidList.append(uuidOfDeuMinePrice)
+        actionUuidList.append(uuidOfSolarPlantPrice)
+        actionUuidList.append(uuidOfFusionReactorPrice)
+        actionUuidList.append(uuidOfMetalStoragePrice)
+        actionUuidList.append(uuidOfCrystalStoragePrice)
+        actionUuidList.append(uuidOfDeuStoragePrice)
 
-    def getResearchPrices(self):
-        researchesDict = self.interractor.research()
-        priceOFResearchesDict = dict(researchesDict)
+        actionUuidList.append(uuidOfRobotFactoryPrice)
+        actionUuidList.append(uuidOfShipyardPrice)
+        actionUuidList.append(uuidOfResearchLabPrice)
+        actionUuidList.append(uuidOfMissleSiloPrice)
+        actionUuidList.append(uuidOfNaniteFactoryPrice)
+        actionUuidList.append(uuidOfTerraformerPrice)
 
-        price = self.interractor.price(constants.ENERGY_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_ENERGY_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_ENERGY_TECH] = price
+        actionUuidList.append(uuidOfEnergyTechPrice)
+        actionUuidList.append(uuidOfLaserTechPrice)
+        actionUuidList.append(uuidOfIonTechPrice)
+        actionUuidList.append(uuidOfHyperSpaceTechPrice)
+        actionUuidList.append(uuidOfPlasmaTechPrice)
+        actionUuidList.append(uuidOfCombustionDrivePrice)
+        actionUuidList.append(uuidOfImpulseDrivePrice)
+        actionUuidList.append(uuidOfHyperspaceDrivePrice)
+        actionUuidList.append(uuidOfSpyTechPrice)
+        actionUuidList.append(uuidOfComputerTechPrice)
+        actionUuidList.append(uuidOfAstrophysicsPrice)
+        actionUuidList.append(uuidOfIntGalResearchPrice)
+        actionUuidList.append(uuidOfGravitonTechPrice)
+        actionUuidList.append(uuidOfWeaponTechPrice)
+        actionUuidList.append(uuidOfShieldTechPrice)
+        actionUuidList.append(uuidOfArmourPrice)
 
-        price = self.interractor.price(constants.LASER_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_LASER_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_LASER_TECH] = price
+        self.waitTillActionsCompleted(actionUuidList)
 
-        price = self.interractor.price(constants.ION_Tech, priceOFResearchesDict[constants.ATTR_NAME_OF_ION_Tech] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_ION_Tech] = price
+        priceOFBuildingsDict = {}
+        result = self.scheduler.getResultOf(uuidOfMetalMinePrice)['Result']
+        result['Energy'] = utilities.getEnergyConsumption(buildingLevelsDict[constants.ATTR_NAME_OF_METAL_MINE] + 1, constants.ATTR_NAME_OF_METAL_MINE)
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] = result
+        result = self.scheduler.getResultOf(uuidOfCrystalMinePrice)['Result']
+        result['Energy'] = utilities.getEnergyConsumption(buildingLevelsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] + 1, constants.ATTR_NAME_OF_CRYSTAL_MINE)
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] = result
+        result = self.scheduler.getResultOf(uuidOfDeuMinePrice)['Result']
+        result['Energy'] = utilities.getEnergyConsumption(buildingLevelsDict[constants.ATTR_NAME_OF_DEU_MINE] + 1, constants.ATTR_NAME_OF_DEU_MINE)
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] = result
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_SOLAR_PLANT] = self.scheduler.getResultOf(uuidOfSolarPlantPrice)['Result']
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_FUSION_REACTOR] = self.scheduler.getResultOf(uuidOfFusionReactorPrice)['Result']
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_METAL_STORAGE] = self.scheduler.getResultOf(uuidOfMetalStoragePrice)['Result']
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_STORAGE] = self.scheduler.getResultOf(uuidOfCrystalStoragePrice)['Result']
+        priceOFBuildingsDict[constants.ATTR_NAME_OF_DEU_STORAGE] = self.scheduler.getResultOf(uuidOfDeuStoragePrice)['Result']
 
-        price = self.interractor.price(constants.HYPER_SPACE_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_HYPER_SPACE_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_HYPER_SPACE_TECH] = price
+        priceOFFacilitiesDict = {}
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_ROBOT_FACTORY] = self.scheduler.getResultOf(uuidOfRobotFactoryPrice)['Result']
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_SHIPYARD] = self.scheduler.getResultOf(uuidOfShipyardPrice)['Result']
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_RESEARCH_LAB] = self.scheduler.getResultOf(uuidOfResearchLabPrice)['Result']
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_MISSILE_SILO] = self.scheduler.getResultOf(uuidOfMissleSiloPrice)['Result']
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_NANITE_FACTORY] = self.scheduler.getResultOf(uuidOfNaniteFactoryPrice)['Result']
+        priceOFFacilitiesDict[constants.ATTR_NAME_OF_TERRAFORMER] = self.scheduler.getResultOf(uuidOfTerraformerPrice)['Result']
 
-        price = self.interractor.price(constants.PLASMA_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_PLASMA_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_PLASMA_TECH] = price
+        priceOFResearchesDict = {}
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ENERGY_TECH] = self.scheduler.getResultOf(uuidOfEnergyTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_LASER_TECH] = self.scheduler.getResultOf(uuidOfLaserTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ION_Tech] = self.scheduler.getResultOf(uuidOfIonTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_HYPER_SPACE_TECH] = self.scheduler.getResultOf(uuidOfHyperSpaceTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_PLASMA_TECH] = self.scheduler.getResultOf(uuidOfPlasmaTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_COMBUSTION_DRIVE] = self.scheduler.getResultOf(uuidOfCombustionDrivePrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_IMPULSE_DRIVE] = self.scheduler.getResultOf(uuidOfImpulseDrivePrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_HYPERSPACE_DRIVE] = self.scheduler.getResultOf(uuidOfHyperspaceDrivePrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_SPY_TECH] = self.scheduler.getResultOf(uuidOfSpyTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_COMPUTER_TECH] = self.scheduler.getResultOf(uuidOfComputerTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ASTROPHYSICS] = self.scheduler.getResultOf(uuidOfAstrophysicsPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_INT_GAL_RESEARCH] = self.scheduler.getResultOf(uuidOfIntGalResearchPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_GRAVITON_TECH] = self.scheduler.getResultOf(uuidOfGravitonTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_WEAPON_TECH] = self.scheduler.getResultOf(uuidOfWeaponTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_SHIELD_TECH] = self.scheduler.getResultOf(uuidOfShieldTechPrice)['Result']
+        priceOFResearchesDict[constants.ATTR_NAME_OF_ARMOUR_TECH] = self.scheduler.getResultOf(uuidOfArmourPrice)['Result']
 
-        price = self.interractor.price(constants.COMBUSTION_DRIVE, priceOFResearchesDict[constants.ATTR_NAME_OF_COMBUSTION_DRIVE] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_COMBUSTION_DRIVE] = price
+        resourcesWithHeader =  {'resources': resourcesDict}
+        BuildingLevelsWithHeader =  {'buildingLevels': buildingLevelsDict}
+        facilityLevelsWithHeader =  {'facilityLevels': facilityLevelsDict}
+        researchLevelsWithHeader = {'researchLevels': researchLevelsDict}
+        ongoingConstAndResearchWithHeader = {'ongoingConstructionsAndResearch': ongoingConstAndResearchDict}
 
-        price = self.interractor.price(constants.IMPULSE_DRIVE, priceOFResearchesDict[constants.ATTR_NAME_OF_IMPULSE_DRIVE] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_IMPULSE_DRIVE] = price
+        #TODO FAKE DATA GET REAL
+        fleetValueWIthHeader = {'fleetValue': 0}
+        buildingPricesWithHeader = {'buildingPrices': priceOFBuildingsDict}
+        facilityPricesWithHeader = {'facilityPrices': priceOFFacilitiesDict}
+        researchPricesWithHeader = {'researchPrices': priceOFResearchesDict}
 
-        price = self.interractor.price(constants.HYPERSPACE_DRIVE, priceOFResearchesDict[constants.ATTR_NAME_OF_HYPERSPACE_DRIVE] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_HYPERSPACE_DRIVE] = price
-
-        price = self.interractor.price(constants.SPY_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_SPY_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_SPY_TECH] = price
-
-        price = self.interractor.price(constants.COMPUTER_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_COMPUTER_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_COMPUTER_TECH] = price
-
-        price = self.interractor.price(constants.ASTROPHYSICS, priceOFResearchesDict[constants.ATTR_NAME_OF_ASTROPHYSICS] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_ASTROPHYSICS] = price
-
-        price = self.interractor.price(constants.INT_GAL_RESEARCH, priceOFResearchesDict[constants.ATTR_NAME_OF_INT_GAL_RESEARCH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_INT_GAL_RESEARCH] = price
-
-        price = self.interractor.price(constants.GRAVITON_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_GRAVITON_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_GRAVITON_TECH] = price
-
-        price = self.interractor.price(constants.WEAPON_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_WEAPON_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_WEAPON_TECH] = price
-
-        price = self.interractor.price(constants.SHIELD_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_SHIELD_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_SHIELD_TECH] = price
-
-        price = self.interractor.price(constants.ARMOUR_TECH, priceOFResearchesDict[constants.ATTR_NAME_OF_ARMOUR_TECH] + 1)
-        priceOFResearchesDict[constants.ATTR_NAME_OF_ARMOUR_TECH] = price
-
-        return {'researchLevels': researchesDict, 'researchPrices': priceOFResearchesDict}
-
-    def getResourceBuildingPrices(self, planetID):
-            resourceBuildingsDict = self.interractor.resourceBuildings(planetID)
-            priceOFResourceBuildingsDict = dict(resourceBuildingsDict)
-
-            levelOfMetalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE]
-            prevLevelOfMetalMine = levelOfMetalMine - 1
-            energyConsumptMetalMine = round(10*levelOfMetalMine*1.1**levelOfMetalMine) - round(10*prevLevelOfMetalMine*1.1**prevLevelOfMetalMine)
-            priceOfMetalMine = self.interractor.price(constants.METAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] + 1)
-            priceOfMetalMine['Energy'] = energyConsumptMetalMine
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_MINE] = priceOfMetalMine
-
-            levelOfCrystalMine = resourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE]
-            prevLevelOfCrystalMine = levelOfCrystalMine - 1
-            energyConsumptCrystalMine = round(10*levelOfCrystalMine*1.1**levelOfCrystalMine) - round(10*prevLevelOfCrystalMine*1.1**prevLevelOfCrystalMine)
-            priceOfCrystalMine = self.interractor.price(constants.CRYSTAL_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] + 1)
-            priceOfCrystalMine['Energy'] = energyConsumptCrystalMine
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_MINE] = priceOfCrystalMine
-
-            levelOfDeuMine = resourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE]
-            prevLevelOfDeuMine = levelOfDeuMine - 1
-            energyConsumptDeuMine = round(20*levelOfDeuMine*1.1**levelOfDeuMine) - round(20*prevLevelOfDeuMine*1.1**prevLevelOfDeuMine)
-            priceOfDeuMine = self.interractor.price(constants.DEU_MINE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] + 1)
-            priceOfDeuMine['Energy'] = energyConsumptDeuMine
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_MINE] = priceOfDeuMine
-
-            priceOfSolarPlant = self.interractor.price(constants.SOLAR_PLANT, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_PLANT] + 1)
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_PLANT] = priceOfSolarPlant
-
-            priceOfFusionReactor = self.interractor.price(constants.FUSION_REACTOR, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_FUSION_REACTOR] + 1)
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_FUSION_REACTOR] = priceOfFusionReactor
-
-            priceOfSolarSatellite = self.interractor.price(constants.SOLAR_SATELLITE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_SATELLITE] + 1)
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_SOLAR_SATELLITE] = priceOfSolarSatellite
-
-            priceOfMetalStorage = self.interractor.price(constants.METAL_STORAGE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_STORAGE] + 1)
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_METAL_STORAGE] = priceOfMetalStorage
-
-            priceOfCrystalStorage = self.interractor.price(constants.CRYSTAL_STORAGE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_STORAGE] + 1)
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_CRYSTAL_STORAGE] = priceOfCrystalStorage
-
-            priceOfDeuStorage = self.interractor.price(constants.DEU_STORAGE, priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_STORAGE] + 1)
-            priceOFResourceBuildingsDict[constants.ATTR_NAME_OF_DEU_STORAGE] = priceOfDeuStorage
-
-            return {'buildingLevels': resourceBuildingsDict, 'buildingPrices': priceOFResourceBuildingsDict}
-
-    def dummyDataSend(self):
-        dummyData = "{'actualResources': {'Crystal': 10000, 'Darkmatter': 0, 'Deuterium': 10000, 'Energy': 220, 'Food': 10, 'Metal': 75000, 'Population': 210}, 'allowanceResources': {'Crystal': 10000, 'Deuterium': 10000, 'Metal': 75000}, 'allowanceShips': {'Crystal': 0, 'Deuterium': 0, 'Metal': 0}, 'buildingLevels': {'MetalMine': 13, 'CrystalMine': 11, 'DeuteriumSynthesizer': 7, 'SolarPlant': 15, 'FusionReactor': 0, 'SolarSatellite': 0, 'MetalStorage': 3, 'CrystalStorage': 0, 'DeuteriumTank': 0}, 'buildingPrices': {'MetalMine': {'Metal': 11677, 'Crystal': 2919, 'Deuterium': 0, 'Energy': 72, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'CrystalMine': {'Metal': 8444, 'Crystal': 4222, 'Deuterium': 0, 'Energy': 55, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'DeuteriumSynthesizer': {'Metal': 3844, 'Crystal': 1281, 'Deuterium': 0, 'Energy': 60, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'SolarPlant': {'Metal': 32842, 'Crystal': 13136, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'FusionReactor': {'Metal': 900, 'Crystal': 360, 'Deuterium': 180, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'SolarSatellite': {'Metal': 0, 'Crystal': 2000, 'Deuterium': 500, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'MetalStorage': {'Metal': 8000, 'Crystal': 0, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'CrystalStorage': {'Metal': 1000, 'Crystal': 500, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'DeuteriumTank': {'Metal': 1000, 'Crystal': 1000, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}}, 'facilityLevels': {'RoboticsFactory': 0, 'Shipyard': 0, 'ResearchLab': 0, 'AllianceDepot': 0, 'MissileSilo': 0, 'NaniteFactory': 0, 'Terraformer': 0, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'facilityPrices': {'RoboticsFactory': {'Metal': 400, 'Crystal': 120, 'Deuterium': 200, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'Shipyard': {'Metal': 400, 'Crystal': 200, 'Deuterium': 100, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ResearchLab': {'Metal': 200, 'Crystal': 400, 'Deuterium': 200, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'AllianceDepot': 0, 'MissileSilo': {'Metal': 20000, 'Crystal': 20000, 'Deuterium': 1000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'NaniteFactory': {'Metal': 1000000, 'Crystal': 500000, 'Deuterium': 100000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'Terraformer': {'Metal': 0, 'Crystal': 50000, 'Deuterium': 100000, 'Energy': 1000, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'SpaceDock': 0, 'LunarBase': 0, 'SensorPhalanx': 0, 'JumpGate': 0}, 'researchLevels': {'EnergyTechnology': 0, 'LaserTechnology': 0, 'IonTechnology': 0, 'HyperspaceTechnology': 0, 'PlasmaTechnology': 0, 'CombustionDrive': 0, 'ImpulseDrive': 0, 'HyperspaceDrive': 0, 'EspionageTechnology': 0, 'ComputerTechnology': 0, 'Astrophysics': 0, 'IntergalacticResearchNetwork': 0, 'GravitonTechnology': 0, 'WeaponsTechnology': 0, 'ShieldingTechnology': 0, 'ArmourTechnology': 0}, 'researchPrices': {'EnergyTechnology': {'Metal': 0, 'Crystal': 800, 'Deuterium': 400, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'LaserTechnology': {'Metal': 200, 'Crystal': 100, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'IonTechnology': {'Metal': 1000, 'Crystal': 300, 'Deuterium': 100, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'HyperspaceTechnology': {'Metal': 0, 'Crystal': 4000, 'Deuterium': 2000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'PlasmaTechnology': {'Metal': 2000, 'Crystal': 4000, 'Deuterium': 1000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'CombustionDrive': {'Metal': 400, 'Crystal': 0, 'Deuterium': 600, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ImpulseDrive': {'Metal': 2000, 'Crystal': 4000, 'Deuterium': 600, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'HyperspaceDrive': {'Metal': 10000, 'Crystal': 20000, 'Deuterium': 6000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'EspionageTechnology': {'Metal': 200, 'Crystal': 1000, 'Deuterium': 200, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ComputerTechnology': {'Metal': 0, 'Crystal': 400, 'Deuterium': 600, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'Astrophysics': {'Metal': 4000, 'Crystal': 8000, 'Deuterium': 4000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'IntergalacticResearchNetwork': {'Metal': 240000, 'Crystal': 400000, 'Deuterium': 160000, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'GravitonTechnology': {'Metal': 0, 'Crystal': 0, 'Deuterium': 0, 'Energy': 300000, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'WeaponsTechnology': {'Metal': 800, 'Crystal': 200, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ShieldingTechnology': {'Metal': 200, 'Crystal': 600, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}, 'ArmourTechnology': {'Metal': 1000, 'Crystal': 0, 'Deuterium': 0, 'Energy': 0, 'Darkmatter': 0, 'Population': 0, 'Food': 0}}}"
-        progressionManagerResponse = self.callProgressionManager(dummyData)
-        print("asdasdad")
+        return {**resourcesWithHeader, **fleetValueWIthHeader, **BuildingLevelsWithHeader, **facilityLevelsWithHeader, **researchLevelsWithHeader, **buildingPricesWithHeader, **facilityPricesWithHeader, **researchPricesWithHeader, **ongoingConstAndResearchWithHeader}
 
